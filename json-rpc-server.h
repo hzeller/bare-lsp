@@ -22,7 +22,9 @@
 class JsonRpcServer {
 public:
   using RPCHandler = std::function<ResponseMessage (const RequestMessage& r)>;
-  using StatusMap = std::map<std::string, int>;
+
+  // Some statistical counters.
+  using StatsMap = std::map<std::string, int>;
 
   // A function that reads from some source and writes result into the
   // buffer. Returns the number of bytes read.
@@ -64,7 +66,7 @@ public:
     handlers_.insert({method_name, fun});
   }
 
-  const StatusMap& GetStatCounters() const { return statistic_counters_; }
+  const StatsMap& GetStatCounters() const { return statistic_counters_; }
 
 private:
   static constexpr absl::string_view kEndHeaderMarker = "\r\n\r\n";
@@ -198,7 +200,7 @@ absl::Status ReadInput(const ReadFun &read_fun, const ReadCallback& process) {
   const WriteFun write_fun_;
 
   std::unordered_map<std::string, RPCHandler> handlers_;
-  StatusMap statistic_counters_;
+  StatsMap statistic_counters_;
   absl::string_view pending_data_;
 };
 

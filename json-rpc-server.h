@@ -2,11 +2,6 @@
 #define JSON_RPC_SERVER_
 
 #include <cassert>
-#include <cerrno>
-#include <cstdlib>
-#include <cstring>
-#include <sys/select.h>
-#include <unistd.h>
 
 #include <functional>
 #include <sstream>
@@ -28,29 +23,30 @@ public:
   using RPCHandler = std::function<ResponseMessage (const RequestMessage& r)>;
   using StatusMap = std::map<std::string, int>;
 
+  // A function that reads from some source and writes result into the
+  // buffer. Returns the number of bytes read.
+  // Blocks until there is content or returns '0' on end-of-file. Values
+  // below zero indicate errors.
+  // Only the amount of bytes available at the time of the call are filled
+  // into the buffer, so the return value can be less than size.
+  // So essentially: this behaves like the standard read() system call.
+  using ReadFun = std::function<int(char *buf, int size)>;
+
   // Read from input file descriptor, write to output stream.
-  JsonRpcServer(int inputfd, std::ostream &out)
-    : input_fd_(inputfd), output_(&out) {
-    EnsureBuffer(65535);
+  JsonRpcServer(std::ostream &out)
+    : output_(&out) {
+    EnsureBuffer(1 << 20);
   }
+
   ~JsonRpcServer() { delete scratch_buffer_; }
 
-  absl::Status Run() {
-    fd_set rd_fds;
-    FD_ZERO(&rd_fds);
-    for (;;) {
-      FD_SET(input_fd_, &rd_fds);
-      int sret = select(input_fd_ + 1, &rd_fds, nullptr, nullptr, nullptr);
-      if (sret < 0) return absl::UnknownError(
-        absl::StrCat("select() on fd=", input_fd_, ": ", strerror(errno)));
-
-      auto status = ReadInput(input_fd_,
-                              [this](absl::string_view data) -> absl::Status {
-                                return Dispatch(data);
-                              });
-
-      if (!status.ok()) return status;
-    }
+  // Process next input. Calls read_fun() exactly once to get the next
+  // amount of data and processes all requests that are in the incoming data.
+  absl::Status ProcessInput(const ReadFun &read_fun) {
+    return ReadInput(read_fun,
+                     [this](absl::string_view data) -> absl::Status {
+                       return Dispatch(data);
+                     });
   }
 
   void AddHandler(const std::string& method_name, const RPCHandler &fun) {
@@ -143,7 +139,7 @@ private:
       }
 
       const int content_size = body_offset + body_size;
-      if (body_offset < 0 || content_size > data->size())
+      if (body_offset < 0 || content_size > (int)data->size())
         return absl::OkStatus();  // Only insufficient partial buffer available.
       absl::string_view body(data->data() + body_offset, body_size);
       if (auto status = process(body); !status.ok()) {
@@ -154,25 +150,32 @@ private:
     return absl::OkStatus();
   }
 
-  absl::Status ReadInput(int fd, const ReadCallback& process) {
-    char *begin_of_buffer = scratch_buffer_;
-    size_t available = scratch_buffer_size_;
+absl::Status ReadInput(const ReadFun &read_fun, const ReadCallback& process) {
+    char *begin_of_read = scratch_buffer_;
+    int available_read_space = scratch_buffer_size_;
 
-    ssize_t partial_read = read(input_fd_, begin_of_buffer, available);
-    if (partial_read <= 0) return absl::UnavailableError(
-      absl::StrCat("read() on fd=", input_fd_, ": ", strerror(errno)));
+    // Get all we had left from last time to the beginning of the buffer.
+    // This is in the same buffer, so we need to memmove()
+    if (!pending_data_.empty()) {
+      memmove(begin_of_read, pending_data_.data(), pending_data_.size());
+      begin_of_read += pending_data_.size();
+      available_read_space -= pending_data_.size();
+    }
+
+    int partial_read = read_fun(begin_of_read, available_read_space);
+    if (partial_read <= 0) {
+      return absl::UnavailableError(absl::StrCat("read() returned ",
+                                                 partial_read));
+    }
     statistic_counters_["TotalBytesRead"] += partial_read;
 
-    absl::string_view data(begin_of_buffer, partial_read);
+    absl::string_view data(scratch_buffer_,
+                           partial_read + pending_data_.size());
     if (auto status = ProcessAllRequests(&data, process); !status.ok()) {
       return status;
     }
 
-    // TODO: simplified assumption that with one read() we get a number
-    // of complete results. In reality, we might have a partial result as
-    // our buffer might be smaller than fits the last message.
-    // Might need to copy to front, maybe realloc etc.
-    assert(data.empty());
+    pending_data_ = data;  // Remember for next round.
 
     return absl::OkStatus();
   }
@@ -189,10 +192,10 @@ private:
     return scratch_buffer_;
   }
 
-  const int input_fd_;
   std::ostream *output_;
   std::unordered_map<std::string, RPCHandler> handlers_;
   StatusMap statistic_counters_;
+  absl::string_view pending_data_;
   char *scratch_buffer_ = nullptr;
   size_t scratch_buffer_size_ = 0;
 };

@@ -1,5 +1,5 @@
 CXX=clang++
-CXXFLAGS=-std=c++17
+CXXFLAGS=-std=c++17 -O3 -W -Wall -Wextra
 LDFLAGS=-labsl_strings -labsl_status
 SCHEMA_COMPILER=../jcxxgen/schema-compiler
 

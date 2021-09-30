@@ -3,8 +3,14 @@
 #include <unistd.h>
 
 int main() {
-  JsonRpcServer server(STDIN_FILENO, std::cout);
-  absl::Status status = server.Run();
+  JsonRpcServer server(std::cout);
+
+  absl::Status status = absl::OkStatus();
+  while (status.ok()) {
+    status = server.ProcessInput([](char *buf, int size) -> int {
+      return read(STDIN_FILENO, buf, size);
+    });
+  }
   if (!status.ok())
     std::cerr << status.message() << std::endl;
 
@@ -14,7 +20,7 @@ int main() {
     longest = std::max(longest, (int)stats.first.length());
   }
   for (const auto &stats : server.GetStatCounters()) {
-    fprintf(stderr, "%*s %7d\n", longest, stats.first.c_str(), stats.second);
+    fprintf(stderr, "%*s %9d\n", longest, stats.first.c_str(), stats.second);
   }
   return status.ok() ? 0 : 1;
 }

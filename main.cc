@@ -1,7 +1,8 @@
-#include "message-stream-splitter.h"
-#include "json-rpc-server.h"
-#include <unistd.h>
 #include <sys/uio.h>
+#include <unistd.h>
+
+#include "json-rpc-server.h"
+#include "message-stream-splitter.h"
 
 static void StringViewWritev(int fd,
                              std::initializer_list<absl::string_view> content) {
@@ -31,7 +32,7 @@ int main() {
 
   absl::Status status = absl::OkStatus();
   while (status.ok()) {
-    status = source.ProcessInput(read_fun);
+    status = source.PullFrom(read_fun);
   }
   if (!status.ok())
     std::cerr << status.message() << std::endl;

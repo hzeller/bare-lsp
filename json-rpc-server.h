@@ -1,23 +1,20 @@
 #ifndef JSON_RPC_SERVER_
 #define JSON_RPC_SERVER_
 
-#include <cassert>
-
 #include <functional>
 #include <initializer_list>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 
-#include <absl/status/statusor.h>
-#include <absl/strings/numbers.h>
+#include <absl/status/status.h>
 #include <absl/strings/str_cat.h>
 #include <absl/strings/string_view.h>
 
 #include <nlohmann/json.hpp>
 
 #include "lsp-protocol.h"
+#include "message-stream-splitter.h"
 
 class JsonRpcServer {
 public:
@@ -40,8 +37,9 @@ public:
   JsonRpcServer(const WriteFun &out, MessageStreamSplitter *source = nullptr)
     : write_fun_(out) {
     if (source) {
-      source->SetBodyProcessor([this](absl::string_view data) {
-        return DispatchMessage(data);
+      source->SetMessageProcessor([this](absl::string_view /*header*/,
+                                         absl::string_view body) {
+        return DispatchMessage(body);
       });
     }
   }

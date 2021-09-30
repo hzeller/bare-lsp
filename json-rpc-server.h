@@ -4,6 +4,7 @@
 #include <cassert>
 
 #include <functional>
+#include <initializer_list>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -32,9 +33,15 @@ public:
   // So essentially: this behaves like the standard read() system call.
   using ReadFun = std::function<int(char *buf, int size)>;
 
+  // Write a list of string_views to the output. Always do a full write,
+  // never partial.
+  // If possible, combine the writes in one write. Behave a bit like
+  // the writev() system call.
+  using WriteFun = std::function<void(std::initializer_list<absl::string_view>)>;
+
   // Read from input file descriptor, write to output stream.
-  JsonRpcServer(std::ostream &out)
-    : output_(&out) {
+  JsonRpcServer(const WriteFun &out)
+    : write_fun_(out) {
     EnsureBuffer(1 << 20);
   }
 
@@ -56,14 +63,15 @@ public:
   const StatusMap& GetStatCounters() const { return statistic_counters_; }
 
 private:
+  static constexpr absl::string_view kEndHeaderMarker = "\r\n\r\n";
+  static constexpr absl::string_view kContentLengthHeader = "Content-Length: ";
+
   static ResponseMessage MethodNotFound(const RequestMessage &req,
                                         absl::string_view msg) {
     ResponseMessage response;
     response.id = req.id;
-    response.error = {
-      .code = 42,
-      .message{msg},
-    };
+    response.error.code = 42;
+    response.error.message.assign(msg.data(), msg.size());
     return response;
   }
 
@@ -72,8 +80,8 @@ private:
     std::stringstream out_bytes;
     out_bytes << j << "\n";
     const std::string& body = out_bytes.str();
-    *output_ << "Content-Length: " << body.size() << "\r\n\r\n";
-    *output_ << body << std::flush;
+    const std::string size_str = std::to_string(body.size());
+    write_fun_({ kContentLengthHeader, size_str, kEndHeaderMarker, body });
   }
 
   absl::Status Dispatch(absl::string_view data) {
@@ -101,9 +109,6 @@ private:
   // Return -1 if header is incomplete. Return -2 if header complete, but
   // issue reading Content-Length header.
   int ParseHeader(absl::string_view data, int *body_size) {
-    static constexpr absl::string_view kEndHeaderMarker = "\r\n\r\n";
-    static constexpr absl::string_view kContentLengthHeader = "Content-Length:";
-
     auto end_of_header = data.find(kEndHeaderMarker);
     if (end_of_header == absl::string_view::npos) return -1; // incomplete
 
@@ -192,7 +197,7 @@ absl::Status ReadInput(const ReadFun &read_fun, const ReadCallback& process) {
     return scratch_buffer_;
   }
 
-  std::ostream *output_;
+  WriteFun write_fun_;
   std::unordered_map<std::string, RPCHandler> handlers_;
   StatusMap statistic_counters_;
   absl::string_view pending_data_;

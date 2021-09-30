@@ -26,6 +26,7 @@
 class JsonRpcServer {
 public:
   using RPCHandler = std::function<ResponseMessage (const RequestMessage& r)>;
+  using StatusMap = std::map<std::string, int>;
 
   // Read from input file descriptor, write to output stream.
   JsonRpcServer(int inputfd, std::ostream &out)
@@ -55,6 +56,10 @@ public:
   void AddHandler(const std::string& method_name, const RPCHandler &fun) {
     handlers_.insert({method_name, fun});
   }
+
+  const StatusMap& GetMethodCallStats() const {
+    return method_invocation_count_;
+  };
 
 private:
   static ResponseMessage MethodNotFound(const RequestMessage &req,
@@ -94,6 +99,7 @@ private:
       SendReply(MethodNotFound(request, absl::StrCat(request.method,
                                                      ": not implemented")));
     }
+    method_invocation_count_[request.method]++;
     return absl::OkStatus();
   }
 
@@ -186,6 +192,7 @@ private:
   const int input_fd_;
   std::ostream *output_;
   std::unordered_map<std::string, RPCHandler> handlers_;
+  StatusMap method_invocation_count_;
   char *scratch_buffer_ = nullptr;
   size_t scratch_buffer_size_ = 0;
 };

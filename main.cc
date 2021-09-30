@@ -16,9 +16,10 @@ static void StringViewWritev(int fd,
 }
 
 int main() {
-  JsonRpcServer server([](std::initializer_list<absl::string_view> content) {
-    StringViewWritev(STDOUT_FILENO, content);
-  });
+  JsonRpcServer server(1 << 20,
+                       [](std::initializer_list<absl::string_view> content) {
+                         StringViewWritev(STDOUT_FILENO, content);
+                       });
 
   absl::Status status = absl::OkStatus();
   while (status.ok()) {

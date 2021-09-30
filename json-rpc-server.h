@@ -33,19 +33,23 @@ public:
   // So essentially: this behaves like the standard read() system call.
   using ReadFun = std::function<int(char *buf, int size)>;
 
-  // Write a list of string_views to the output. Always do a full write,
-  // never partial.
-  // If possible, combine the writes in one write. Behave a bit like
-  // the writev() system call.
-  using WriteFun = std::function<void(std::initializer_list<absl::string_view>)>;
+  // Write a list of string_views to the output.
+  // If possible, combine the writes in one write.
+  // Behave a bit like the writev() system call.
+  // No return value, function is assumed to always write fully.
+  using WriteFun =
+    std::function<void(std::initializer_list<absl::string_view>)>;
 
-  // Read from input file descriptor, write to output stream.
-  JsonRpcServer(const WriteFun &out)
-    : write_fun_(out) {
-    EnsureBuffer(1 << 20);
+  // Read using an internal buffer of "read_buffer_size", which must be larger
+  // than the largest expected message.
+  // Responses are written using the "out" write function.
+  JsonRpcServer(size_t read_buffer_size, const WriteFun &out)
+    : read_buffer_size_(read_buffer_size),
+      read_buffer_(new char [read_buffer_size]),
+      write_fun_(out) {
   }
 
-  ~JsonRpcServer() { delete scratch_buffer_; }
+  ~JsonRpcServer() { delete [] read_buffer_; }
 
   // Process next input. Calls read_fun() exactly once to get the next
   // amount of data and processes all requests that are in the incoming data.
@@ -130,7 +134,8 @@ private:
 
   // Read from data and process all fully available content header+bodies
   // found in data. Updates "data" to return the remaining unprocessed data.
-  // Returns ok() status unless one of the process() call fails.
+  // Returns ok() status unless header is corrupted or one of the process()
+  // call fails.
   absl::Status ProcessAllRequests(absl::string_view *data,
                                   const ReadCallback& process) {
     while (!data->empty()) {
@@ -150,14 +155,18 @@ private:
       if (auto status = process(body); !status.ok()) {
         return status;
       }
+
+      int* largest = &statistic_counters_["LargestProcessedBody"];
+      *largest = std::max((int)body.size(), *largest);
+
       *data = { data->data() + content_size, data->size() - content_size };
     }
     return absl::OkStatus();
   }
 
 absl::Status ReadInput(const ReadFun &read_fun, const ReadCallback& process) {
-    char *begin_of_read = scratch_buffer_;
-    int available_read_space = scratch_buffer_size_;
+    char *begin_of_read = read_buffer_;
+    int available_read_space = read_buffer_size_;
 
     // Get all we had left from last time to the beginning of the buffer.
     // This is in the same buffer, so we need to memmove()
@@ -174,8 +183,7 @@ absl::Status ReadInput(const ReadFun &read_fun, const ReadCallback& process) {
     }
     statistic_counters_["TotalBytesRead"] += partial_read;
 
-    absl::string_view data(scratch_buffer_,
-                           partial_read + pending_data_.size());
+    absl::string_view data(read_buffer_, pending_data_.size() + partial_read);
     if (auto status = ProcessAllRequests(&data, process); !status.ok()) {
       return status;
     }
@@ -185,24 +193,13 @@ absl::Status ReadInput(const ReadFun &read_fun, const ReadCallback& process) {
     return absl::OkStatus();
   }
 
-  char *EnsureBuffer(size_t size) {
-    static constexpr uint32_t kBlockSizeBits = 12;
-    static constexpr uint32_t kBlockSizePattern = ((1 << kBlockSizeBits) - 1);
-    if (!scratch_buffer_ || scratch_buffer_size_ < size) {
-      const size_t new_size = (size + kBlockSizePattern) & ~kBlockSizePattern;
-      fprintf(stderr, "new size: %d\n", (int)new_size);
-      scratch_buffer_ = (char*)realloc(scratch_buffer_, new_size);
-      scratch_buffer_size_ = new_size;
-    }
-    return scratch_buffer_;
-  }
+  const size_t read_buffer_size_;
+  char *const read_buffer_;
+  const WriteFun write_fun_;
 
-  WriteFun write_fun_;
   std::unordered_map<std::string, RPCHandler> handlers_;
   StatusMap statistic_counters_;
   absl::string_view pending_data_;
-  char *scratch_buffer_ = nullptr;
-  size_t scratch_buffer_size_ = 0;
 };
 
 #endif  // JSON_RPC_SERVER_

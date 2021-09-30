@@ -34,8 +34,8 @@ public:
 
   // Function called with each complete message that has been extracted from
   // the stream.
-  using MessageProcessFun = std::function<absl::Status(absl::string_view header,
-                                                       absl::string_view body)>;
+  using MessageProcessFun = std::function<void(absl::string_view header,
+                                               absl::string_view body)>;
 
   // Read using an internal buffer of "read_buffer_size", which must be larger
   // than the largest expected message.
@@ -119,9 +119,7 @@ private:
 
       absl::string_view header(data->data(), body_offset);
       absl::string_view body(data->data() + body_offset, body_size);
-      if (auto status = message_processor_(header, body); !status.ok()) {
-        return status;
-      }
+      message_processor_(header, body);
 
       stats_largest_body_ = std::max(stats_largest_body_, body.size());
 

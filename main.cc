@@ -4,18 +4,6 @@
 #include "json-rpc-server.h"
 #include "message-stream-splitter.h"
 
-static void StringViewWritev(int fd,
-                             std::initializer_list<absl::string_view> content) {
-  struct iovec iov[content.size()];
-  struct iovec *iov_it = iov;
-  for (const auto &s : content) {
-    iov_it->iov_base = (char*)s.data();
-    iov_it->iov_len = s.size();
-    iov_it++;
-  }
-  writev(fd, iov, content.size());
-}
-
 int main() {
   MessageStreamSplitter::ReadFun read_fun =
     [](char *buf, int size) -> int {
@@ -23,12 +11,17 @@ int main() {
     };
 
   JsonRpcServer::WriteFun write_fun =
-    [](std::initializer_list<absl::string_view> content) {
-      StringViewWritev(STDOUT_FILENO, content);
+    [](absl::string_view reply) {
+      std::cout << reply;
     };
 
   MessageStreamSplitter source(1 << 20);
-  JsonRpcServer server(write_fun, &source);
+  JsonRpcServer server(write_fun);
+
+  source.SetMessageProcessor([&server](absl::string_view /*header*/,
+                                       absl::string_view body) {
+    return server.DispatchMessage(body);
+  });
 
   absl::Status status = absl::OkStatus();
   while (status.ok()) {

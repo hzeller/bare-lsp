@@ -6,7 +6,7 @@ SCHEMA_COMPILER=../jcxxgen/schema-compiler
 lsp-server: main.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-main.o: main.cc json-rpc-server.h lsp-protocol.h
+main.o: main.cc json-rpc-server.h lsp-protocol.h message-stream-splitter.h
 
 json-rpc-server.h: lsp-protocol.h
 

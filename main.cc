@@ -8,9 +8,13 @@ int main() {
   if (!status.ok())
     std::cerr << status.message() << std::endl;
 
-  fprintf(stderr, "-- method call count stats --\n");
-  for (const auto &stats : server.GetMethodCallStats()) {
-    fprintf(stderr, "%-32s %5d\n", stats.first.c_str(), stats.second);
+  fprintf(stderr, "--------------- Statistic Counters Stats ---------------\n");
+  int longest = 0;
+  for (const auto &stats : server.GetStatCounters()) {
+    longest = std::max(longest, (int)stats.first.length());
+  }
+  for (const auto &stats : server.GetStatCounters()) {
+    fprintf(stderr, "%*s %7d\n", longest, stats.first.c_str(), stats.second);
   }
   return status.ok() ? 0 : 1;
 }

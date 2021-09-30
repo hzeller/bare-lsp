@@ -57,9 +57,7 @@ public:
     handlers_.insert({method_name, fun});
   }
 
-  const StatusMap& GetMethodCallStats() const {
-    return method_invocation_count_;
-  };
+  const StatusMap& GetStatCounters() const { return statistic_counters_; }
 
 private:
   static ResponseMessage MethodNotFound(const RequestMessage &req,
@@ -88,6 +86,7 @@ private:
       request = nlohmann::json::parse(data);
     }
     catch (const std::exception &e) {
+      statistic_counters_[e.what()]++;
       SendReply(MethodNotFound(request, e.what()));
     }
 
@@ -99,7 +98,7 @@ private:
       SendReply(MethodNotFound(request, absl::StrCat(request.method,
                                                      ": not implemented")));
     }
-    method_invocation_count_[request.method]++;
+    statistic_counters_[request.method]++;
     return absl::OkStatus();
   }
 
@@ -162,6 +161,7 @@ private:
     ssize_t partial_read = read(input_fd_, begin_of_buffer, available);
     if (partial_read <= 0) return absl::UnavailableError(
       absl::StrCat("read() on fd=", input_fd_, ": ", strerror(errno)));
+    statistic_counters_["TotalBytesRead"] += partial_read;
 
     absl::string_view data(begin_of_buffer, partial_read);
     if (auto status = ProcessAllRequests(&data, process); !status.ok()) {
@@ -192,7 +192,7 @@ private:
   const int input_fd_;
   std::ostream *output_;
   std::unordered_map<std::string, RPCHandler> handlers_;
-  StatusMap method_invocation_count_;
+  StatusMap statistic_counters_;
   char *scratch_buffer_ = nullptr;
   size_t scratch_buffer_size_ = 0;
 };

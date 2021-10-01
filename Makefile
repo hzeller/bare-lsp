@@ -13,7 +13,7 @@ json-rpc-server.h: lsp-protocol.h
 lsp-protocol.h: lsp-protocol.yaml
 
 %.h : %.yaml $(SCHEMA_COMPILER)
-	$(SCHEMA_COMPILER) $< > $@
+	$(SCHEMA_COMPILER) $< -o $@
 
 clean:
 	rm -f main.o lsp-server lsp-protocol.h

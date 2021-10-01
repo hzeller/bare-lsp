@@ -102,7 +102,7 @@ private:
     const auto& found = handlers_.find(method);
     if (found != handlers_.end()) {
       try {
-        SendReply(found->second(req["params"]));  // TODO: wrap result.
+        SendReply(MakeResponse(req, found->second(req["params"])));
         return true;
       }
       catch (const std::exception &e) {
@@ -129,6 +129,16 @@ private:
       result["id"] = request["id"];
     }
 
+    return result;
+  }
+
+  static nlohmann::json MakeResponse(const nlohmann::json &request,
+                                     const nlohmann::json &call_result) {
+    nlohmann::json result = {
+      {"jsonrpc", "2.0"},
+    };
+    result["id"] = request["id"];
+    result["result"] = call_result;
     return result;
   }
 

@@ -28,7 +28,7 @@ int main() {
   server.AddNotificationHandler(
     "textDocument/didOpen",
     [](const DidOpenTextDocumentParams &p) {
-      //std::cerr << p.textDocument.text;
+      std::cerr << p.textDocument.languageId << "\n";
     });
   server.AddNotificationHandler(
     "textDocument/didSave",
@@ -36,10 +36,26 @@ int main() {
       //std::cerr << "Save:" << p.textDocument.uri << "\n";
     });
   server.AddNotificationHandler(
+    "textDocument/didClose",
+    [](const DidSaveTextDocumentParams &p) {
+      //std::cerr << "Close:" << p.textDocument.uri << "\n";
+    });
+
+  server.AddRequestHandler(
+    "textDocument/codeAction",
+    [](const CodeActionParams &p) -> std::vector<CodeAction> {
+      return {
+        { .title = "foo",
+          .diagnostics = {},
+        },
+      };
+    });
+
+  server.AddNotificationHandler(
     "textDocument/didChange",
     [](const DidChangeTextDocumentParams &p) {
-      std::cerr << "Change: " << p.textDocument.uri << "\n";
-      for (const auto &c : p.contentChanges) {
+      //std::cerr << "Change: " << p.textDocument.uri << "\n";
+      if (false) for (const auto &c : p.contentChanges) {
         std::cerr << "  ["
                   << c.range.start.line << "," << c.range.start.character
                   << "-"

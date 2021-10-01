@@ -39,12 +39,37 @@ TextDocumentContentChangeEvent:
   range?: Range
   text: string
 
-DidOpenTextDocumentParams:
+# -- Text document notifiations.
+DidOpenTextDocumentParams:      # textDocument/didOpen
   textDocument: TextDocumentItem
 
-DidSaveTextDocumentParams:
-  textDocument: TextDocumentIdentifier
-
-DidChangeTextDocumentParams:
+DidChangeTextDocumentParams:    # textDocument/didChange
   textDocument: VersionedTextDocumentIdentifier
   contentChanges+: TextDocumentContentChangeEvent
+
+DidSaveTextDocumentParams:      # textDocument/didSave
+  textDocument: TextDocumentIdentifier
+
+DidCloseTextDocumentParams:     # textDocument/didClose
+  textDocument: TextDocumentIdentifier
+
+# -- Code action
+CodeActionParams:              # textDocument/codeAction
+  #<:WorkDoneProgressParams,
+  #<:PartialResultParams
+  textDocument: TextDocumentIdentifier
+  range: Range
+  #context: CodeActionContext
+
+CodeAction:  # Response to code action is either an array of these
+  title: string
+  #kind?: string   # Kind of change e.g quickfix, refactor, ...
+  diagnostics+: Diagnostic
+  isPreferred: boolean = false
+  #edit?: WorkspaceEdit
+
+# -- textDocument/publishDiagnostics
+# This is a notification that is sent from the server to the client
+PublishDiagnosticParams:
+  uri: string
+  diagnostics+: Diagnostic

@@ -46,9 +46,6 @@ public:
   const StatsMap& GetStatCounters() const { return statistic_counters_; }
 
   // Dispatch incoming message, a string view with json data.
-  //
-  // This function is typically called by the MessageStreamSplitter provided
-  // at construction time, but can also be called manually (e.g. for testing).
   void DispatchMessage(absl::string_view data) {
     nlohmann::json request;
     try {
@@ -57,32 +54,24 @@ public:
     catch (const std::exception &e) {
       statistic_counters_[e.what()]++;
       SendReply(CreateError(request, kParseError, e.what()));
+      return;
     }
 
-    // Direct dispatch, later maybe send to thread-pool
     const bool is_notification = (request.find("id") == request.end());
     if (request.find("method") == request.end()) {
       SendReply(CreateError(request, kMethodNotFound,
                             "Method required in request"));
+      statistic_counters_["Request without method"]++;
       return;
     }
-    bool handled = false;
     const std::string &method = request["method"];
+
+    // Direct dispatch, later maybe send to thread-pool ?
+    bool handled = false;
     if (is_notification) {
-      const auto& found = notifications_.find(method);
-      if (found != notifications_.end()) {
-        found->second(request["params"]);
-        handled = true;
-      }
+      handled = CallNotification(request, method);
     } else {
-      const auto& found = handlers_.find(method);
-      if (found != handlers_.end()) {
-        SendReply(found->second(request["params"]));  // wrap result.
-        handled = true;
-      } else {
-        SendReply(CreateError(request, kMethodNotFound,
-                              "method '" + method + "' not found."));
-      }
+      handled = CallRequestHandler(request, method);
     }
     statistic_counters_[method +
                         (handled ? "" : " (unhandled)") +
@@ -93,6 +82,38 @@ public:
 private:
   static constexpr int kParseError = -32700;
   static constexpr int kMethodNotFound= -32601;
+
+  bool CallNotification(const nlohmann::json &req, const std::string &method) {
+    const auto& found = notifications_.find(method);
+    if (found == notifications_.end()) return false;
+    try {
+      found->second(req["params"]);
+      return true;
+    }
+    catch (const std::exception &e) {
+      // Issue while implicitly converting from json to type.
+      statistic_counters_[method + " : " + e.what()]++;
+    }
+    return false;
+  }
+
+  bool CallRequestHandler(const nlohmann::json &req,
+                          const std::string &method) {
+    const auto& found = handlers_.find(method);
+    if (found != handlers_.end()) {
+      try {
+        SendReply(found->second(req["params"]));  // TODO: wrap result.
+        return true;
+      }
+      catch (const std::exception &e) {
+        statistic_counters_[method + " : " + e.what()]++;
+      }
+    } else {
+      SendReply(CreateError(req, kMethodNotFound,
+                            "method '" + method + "' not found."));
+    }
+    return false;
+  }
 
   static nlohmann::json CreateError(const nlohmann::json &request,
                                     int code, absl::string_view message) {

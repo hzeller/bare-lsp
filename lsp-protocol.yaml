@@ -36,7 +36,7 @@ VersionedTextDocumentIdentifier:
   version: integer
 
 TextDocumentContentChangeEvent:
-  range: Range
+  range?: Range
   text: string
 
 DidOpenTextDocumentParams:
@@ -47,4 +47,4 @@ DidSaveTextDocumentParams:
 
 DidChangeTextDocumentParams:
   textDocument: VersionedTextDocumentIdentifier
-  #contentChanges+: TextDocumentContentChangeEvent
+  contentChanges+: TextDocumentContentChangeEvent

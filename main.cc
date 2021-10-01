@@ -25,18 +25,30 @@ int main() {
     return server.DispatchMessage(body);
   });
 
-  int cancelled_count = 0;
-  server.AddNotificationHandler("textDocument/didOpen",
-                                [](const DidOpenTextDocumentParams &p) {
-                                  std::cerr << p.textDocument.text;
-                                });
-  server.AddNotificationHandler("textDocument/didSave",
-                                [](const DidSaveTextDocumentParams &p) {
-                                  std::cerr << "Save:" << p.textDocument.uri << "\n";
-                                });
-  server.AddNotificationHandler("textDocument/didChange",
-                                [](const DidChangeTextDocumentParams &p) {
-                                });
+  server.AddNotificationHandler(
+    "textDocument/didOpen",
+    [](const DidOpenTextDocumentParams &p) {
+      //std::cerr << p.textDocument.text;
+    });
+  server.AddNotificationHandler(
+    "textDocument/didSave",
+    [](const DidSaveTextDocumentParams &p) {
+      //std::cerr << "Save:" << p.textDocument.uri << "\n";
+    });
+  server.AddNotificationHandler(
+    "textDocument/didChange",
+    [](const DidChangeTextDocumentParams &p) {
+      std::cerr << "Change: " << p.textDocument.uri << "\n";
+      for (const auto &c : p.contentChanges) {
+        std::cerr << "  ["
+                  << c.range.start.line << "," << c.range.start.character
+                  << "-"
+                  << c.range.end.line << "," << c.range.end.character
+                  << "] '"
+                  << c.text << "'\n";
+      }
+    });
+
   absl::Status status = absl::OkStatus();
   while (status.ok()) {
     status = source.PullFrom(read_fun);

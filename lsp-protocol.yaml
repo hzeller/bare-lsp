@@ -1,31 +1,6 @@
 # Schema to experiment with. This is a few types from the
 # Language Server Protocol as it is not entirely trivial.
 
-Message:
-  jsonrpc: string = "2.0"
-
-ResponseError:
-  code: integer
-  message: string
-  data?: string | integer | boolean | array | object | null
-
-RequestMessage:
-  <: Message
-  id: integer
-  method: string
-  params: object | array
-
-ResponseMessage:
-  <: Message
-  id: integer
-  result?: string | integer | boolean | object | null
-  error?: ResponseError
-
-NotificationMessage:
-  <: Message
-  method: string
-  params?: object | array
-
 Position:
   line: integer
   character: integer
@@ -37,3 +12,39 @@ Range:
 Location:
   uri: string
   range: Range
+
+LocationLink:
+  targetUri: string
+  targetRange: Range
+  targetSelectionRange: Range
+
+Diagnostic:
+  range: Range
+  message: string
+
+TextDocumentIdentifier:
+  uri: string
+
+TextDocumentItem:
+  <:TextDocumentIdentifier
+  languageId: string
+  version: integer
+  text: string
+
+VersionedTextDocumentIdentifier:
+  <:TextDocumentIdentifier
+  version: integer
+
+TextDocumentContentChangeEvent:
+  range: Range
+  text: string
+
+DidOpenTextDocumentParams:
+  textDocument: TextDocumentItem
+
+DidSaveTextDocumentParams:
+  textDocument: TextDocumentIdentifier
+
+DidChangeTextDocumentParams:
+  textDocument: VersionedTextDocumentIdentifier
+  #contentChanges+: TextDocumentContentChangeEvent

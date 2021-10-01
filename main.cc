@@ -4,6 +4,8 @@
 #include "json-rpc-server.h"
 #include "message-stream-splitter.h"
 
+#include "lsp-protocol.h"
+
 int main() {
   MessageStreamSplitter::ReadFun read_fun =
     [](char *buf, int size) -> int {
@@ -23,6 +25,18 @@ int main() {
     return server.DispatchMessage(body);
   });
 
+  int cancelled_count = 0;
+  server.AddNotificationHandler("textDocument/didOpen",
+                                [](const DidOpenTextDocumentParams &p) {
+                                  std::cerr << p.textDocument.text;
+                                });
+  server.AddNotificationHandler("textDocument/didSave",
+                                [](const DidSaveTextDocumentParams &p) {
+                                  std::cerr << "Save:" << p.textDocument.uri << "\n";
+                                });
+  server.AddNotificationHandler("textDocument/didChange",
+                                [](const DidChangeTextDocumentParams &p) {
+                                });
   absl::Status status = absl::OkStatus();
   while (status.ok()) {
     status = source.PullFrom(read_fun);

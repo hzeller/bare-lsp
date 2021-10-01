@@ -84,7 +84,10 @@ public:
                               "method '" + method + "' not found."));
       }
     }
-    statistic_counters_[method + (handled ? "" : " (unhandled)")]++;
+    statistic_counters_[method +
+                        (handled ? "" : " (unhandled)") +
+                        (is_notification ? " ." : " R")
+                        ]++;
   }
 
 private:

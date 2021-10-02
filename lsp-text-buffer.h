@@ -72,14 +72,23 @@ public:
     }
   }
 
+  size_t lines() const { return lines_.size(); }
+  int64_t document_length() const { return document_length_; }
+
 private:
   void ReplaceDocument(absl::string_view content) {
-    std::cerr << "ReplaceDocument()\n";
     document_length_ = content.length();
     lines_.clear();
+    if (content.empty()) return;
     for (const absl::string_view s : absl::StrSplit(content, '\n')) {
       lines_.emplace_back(new std::string(s));
       lines_.back()->append("\n");  // So that flattening works
+    }
+    // Files that do or do not have a newline file-ending: represent correctly.
+    if (content.back() == '\n') {
+      lines_.pop_back();
+    } else {
+      lines_.back()->pop_back();
     }
   }
 

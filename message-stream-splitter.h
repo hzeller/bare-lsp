@@ -23,8 +23,8 @@
 // The header data MUST contain a Content-Length header.
 class MessageStreamSplitter {
 public:
-  // A function that reads from some source and writes result into the
-  // buffer. Returns the number of bytes read.
+  // A function that reads from some source and writes up to "size" bytes
+  // into the buffer. Returns the number of bytes read.
   // Blocks until there is content or returns '0' on end-of-file. Values
   // below zero indicate errors.
   // Only the amount of bytes available at the time of the call are filled
@@ -42,6 +42,7 @@ public:
   MessageStreamSplitter(size_t read_buffer_size)
       : read_buffer_size_(read_buffer_size),
         read_buffer_(new char[read_buffer_size]) {}
+  MessageStreamSplitter(const MessageStreamSplitter&) = delete;
 
   ~MessageStreamSplitter() { delete[] read_buffer_; }
 

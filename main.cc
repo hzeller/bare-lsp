@@ -1,11 +1,11 @@
-#include <sys/uio.h>
-#include <unistd.h>
 
 #include "json-rpc-server.h"
 #include "message-stream-splitter.h"
 
 #include "lsp-protocol.h"
 #include "lsp-text-buffer.h"
+
+#include <unistd.h>
 
 int main() {
   MessageStreamSplitter::ReadFun read_fun =

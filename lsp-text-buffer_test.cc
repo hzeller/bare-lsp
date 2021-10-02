@@ -117,7 +117,7 @@ TEST(TextBufferTest, ChangeApplySingleLine_Erase) {
   });
 }
 
-TEST(TextBufferTest, ChangeApplySingleLineReplaceCorrectOverlongEnd) {
+TEST(TextBufferTest, ChangeApplySingleLine_ReplaceCorrectOverlongEnd) {
   const TextDocumentContentChangeEvent change = {
     .range = {
       .start = { 0, 6 },
@@ -144,7 +144,7 @@ TEST(TextBufferTest, ChangeApplySingleLineReplaceCorrectOverlongEnd) {
   }
 }
 
-TEST(TextBufferTest, ChangeApplyMultiLineEraseBetweenLines) {
+TEST(TextBufferTest, ChangeApplyMultiLine_EraseBetweenLines) {
   EditTextBuffer buffer("Hello\nWorld\n");
   const TextDocumentContentChangeEvent change = {
     .range = {
@@ -162,7 +162,7 @@ TEST(TextBufferTest, ChangeApplyMultiLineEraseBetweenLines) {
 }
 
 
-TEST(TextBufferTest, ChangeApplyMultiLineInsertMoreLines) {
+TEST(TextBufferTest, ChangeApplyMultiLine_InsertMoreLines) {
   EditTextBuffer buffer("Hello\nbrave World\n");
   const TextDocumentContentChangeEvent change = {
     .range = {
@@ -197,6 +197,25 @@ TEST(TextBufferTest, ChangeApplyMultiLine_InsertFromStart) {
   EXPECT_EQ(buffer.lines(), 3);
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("This is now\na multiline\nfile\n", std::string(s));
+  });
+  // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
+}
+
+TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
+  EditTextBuffer buffer("Foo\nBar\nBaz\nQuux");
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 1, 0 },
+      .end = { 3, 0 },
+    },
+    .has_range = true,
+    .text = "",
+  };
+  EXPECT_EQ(buffer.lines(), 4);
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  EXPECT_EQ(buffer.lines(), 2);
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("Foo\nQuux", std::string(s));
   });
   // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
 }

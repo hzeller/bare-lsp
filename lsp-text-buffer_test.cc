@@ -67,6 +67,22 @@ TEST(TextBufferTest, ChangeApplySingleLine_Insert) {
   });
 }
 
+TEST(TextBufferTest, ChangeApplySingleLine_InsertFromEmptyFile) {
+  EditTextBuffer buffer("");
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 0, 0 },
+      .end = { 0, 0 },
+    },
+    .has_range = true,
+    .text = "New File!",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("New File!", std::string(s));
+  });
+}
+
 TEST(TextBufferTest, ChangeApplySingleLine_Replace) {
   EditTextBuffer buffer("Hello World\n");
   const TextDocumentContentChangeEvent change = {

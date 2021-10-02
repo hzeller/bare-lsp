@@ -39,23 +39,8 @@ public:
   // valid for the duration of the call.
   void ProcessContent(const std::function<void(absl::string_view)> &processor);
 
-  void EditLine(const TextDocumentContentChangeEvent &c, std::string *str) {
-    int end_char = c.range.end.character;
-
-    const int str_end = str->back() == '\n' ? str->length()-1 : str->length();
-    if (c.range.start.character > str_end) return;  // TODO: error state ?
-    if (end_char > str_end) end_char = str_end;
-
-    document_length_ -= str->length();
-    absl::string_view assembly = *str;
-    absl::string_view before = assembly.substr(0, c.range.start.character);
-    absl::string_view behind = assembly.substr(end_char);
-    *str = absl::StrCat(before, c.text, behind);
-    document_length_ += str->length();
-  }
-
-  void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &changes) {
-    for (const auto &c : changes) ApplyChange(c);
+  void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &cc) {
+    for (const auto &c : cc) ApplyChange(c);
   }
 
   void ApplyChange(const TextDocumentContentChangeEvent &c) {
@@ -65,9 +50,11 @@ public:
       return;
     }
 
-    while (c.range.start.line >= (int)lines_.size()) {
-      lines_.emplace_back(new std::string("\n"));
+    if (c.range.start.line >= (int)lines_.size() ||
+        c.range.end.line >= (int)lines_.size()) {
+      return;  // mmh
     }
+
     if (c.range.start.line == c.range.end.line) {
       EditLine(c, lines_[c.range.start.line].get());
     } else {
@@ -97,6 +84,21 @@ private:
     } else {
       lines_.back()->pop_back();
     }
+  }
+
+  void EditLine(const TextDocumentContentChangeEvent &c, std::string *str) {
+    int end_char = c.range.end.character;
+
+    const int str_end = str->back() == '\n' ? str->length()-1 : str->length();
+    if (c.range.start.character > str_end) return;  // TODO: error state ?
+    if (end_char > str_end) end_char = str_end;
+
+    document_length_ -= str->length();
+    absl::string_view assembly = *str;
+    absl::string_view before = assembly.substr(0, c.range.start.character);
+    absl::string_view behind = assembly.substr(end_char);
+    *str = absl::StrCat(before, c.text, behind);
+    document_length_ += str->length();
   }
 
   int64_t edit_count_ = 0;

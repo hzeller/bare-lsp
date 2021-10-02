@@ -75,6 +75,21 @@ TEST(TextBufferTest, ChangeApplySingleLineReplace) {
   });
 }
 
+TEST(TextBufferTest, ChangeApplySingleLineReplaceNotFirstLine) {
+  EditTextBuffer buffer("Hello World\nFoo\n");
+  buffer.ApplyChange({
+      .range = {
+        .start = { 1, 0 },
+        .end = { 1, 3},
+      },
+      .has_range = true,
+      .text = "Bar",
+    });
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("Hello World\nBar\n", std::string(s));
+  });
+}
+
 TEST(TextBufferTest, ChangeApplySingleLineReplaceCorrectOverlongEnd) {
   const TextDocumentContentChangeEvent change = {
     .range = {

@@ -6,8 +6,9 @@
 #include <memory>
 #include <iostream>
 
-#include <absl/strings/string_view.h>
+#include <absl/strings/str_cat.h>
 #include <absl/strings/str_split.h>
+#include <absl/strings/string_view.h>
 
 #include "lsp-protocol.h"
 
@@ -40,35 +41,41 @@ public:
 
   void EditLine(const TextDocumentContentChangeEvent &c, std::string *str) {
     int end_char = c.range.end.character;
-    if (end_char > (int)str->length() - 2)  // before newline, so -2
-      end_char = str->length() - 2;
-    if (c.range.start.character > end_char) return;  // mmh
-    str->replace(c.range.start.character, end_char, c.text);
-    document_length_ = document_length_
-      + c.text.length()
-      - (end_char - c.range.start.character);
+
+    const int str_end = str->back() == '\n' ? str->length()-1 : str->length();
+    if (c.range.start.character > str_end) return;  // TODO: error state ?
+    if (end_char > str_end) end_char = str_end;
+
+    document_length_ -= str->length();
+    absl::string_view assembly = *str;
+    absl::string_view before = assembly.substr(0, c.range.start.character);
+    absl::string_view behind = assembly.substr(end_char);
+    *str = absl::StrCat(before, c.text, behind);
+    document_length_ += str->length();
   }
 
   void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &changes) {
-    for (const auto &c : changes) {
-      if (c.has_range) {
-        while (c.range.start.line >= (int)lines_.size()) {
-          lines_.emplace_back(new std::string("\n"));
-        }
-        if (c.range.start.line == c.range.end.line) {
-          EditLine(c, lines_[c.range.start.line].get());
-        } else {
-          std::cerr << "multiline "
-                    << c.range.start.line << ":" << c.range.start.character
-                    << "-"
-                    << c.range.end.line << ":" << c.range.end.character
-                    << " len:" << c.text.length() << "'" << c.text << "'\n";
-          // we edit first line and
-        }
-      } else {
-        ReplaceDocument(c.text);
-      }
-      ++edit_count_;
+    for (const auto &c : changes) ApplyChange(c);
+  }
+
+  void ApplyChange(const TextDocumentContentChangeEvent &c) {
+    ++edit_count_;
+    if (!c.has_range) {
+      ReplaceDocument(c.text);
+      return;
+    }
+
+    while (c.range.start.line >= (int)lines_.size()) {
+      lines_.emplace_back(new std::string("\n"));
+    }
+    if (c.range.start.line == c.range.end.line) {
+      EditLine(c, lines_[c.range.start.line].get());
+    } else {
+      std::cerr << "multiline " << c.range.start.line << ":"
+                << c.range.start.character << "-" << c.range.end.line << ":"
+                << c.range.end.character << " len:" << c.text.length() << "'"
+                << c.text << "'\n";
+      // we edit first line and
     }
   }
 

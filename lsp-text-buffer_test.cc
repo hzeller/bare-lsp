@@ -179,5 +179,24 @@ TEST(TextBufferTest, ChangeApplyMultiLineInsertMoreLines) {
     EXPECT_EQ("Hey!\nThis will be a new line\nand more in this World\n",
               std::string(s));
   });
-  // EXPECT_EQ(buffer.document_length(), 10);  // won't work yet.
+  // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
+}
+
+TEST(TextBufferTest, ChangeApplyMultiLine_InsertFromStart) {
+  EditTextBuffer buffer("");
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 0, 0 },  // From here to end of line
+      .end = { 0, 0 },
+    },
+    .has_range = true,
+    .text = "This is now\na multiline\nfile\n",
+  };
+  EXPECT_EQ(buffer.lines(), 0);
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  EXPECT_EQ(buffer.lines(), 3);
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("This is now\na multiline\nfile\n", std::string(s));
+  });
+  // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
 }

@@ -32,9 +32,6 @@ public:
     ReplaceDocument(initial_text);
   }
 
-  ~EditTextBuffer() {
-  }
-
   // Requst to call function "processor" that gets a string_view that is
   // valid for the duration of the call.
   void ProcessContent(const std::function<void(absl::string_view)> &processor);
@@ -50,20 +47,20 @@ public:
       return true;
     }
 
-    if (c.range.start.line >= (int)lines_.size() ||
-        c.range.end.line >= (int)lines_.size()) {
-      return false;  // mmh
+    if (c.range.end.line >= (int)lines_.size()) {
+      lines_.emplace_back(new std::string(""));
     }
 
-    if (c.range.start.line == c.range.end.line) {
+    if (c.range.start.line == c.range.end.line &&
+        c.text.find_first_of('\n') == std::string::npos) {
       return EditLine(c, lines_[c.range.start.line].get());
     } else {
+      // Multiline edit.
       const absl::string_view start_line = *lines_[c.range.start.line];
       const auto before = start_line.substr(0, c.range.start.character);
 
       const absl::string_view end_line = *lines_[c.range.end.line];
       const auto behind = end_line.substr(c.range.end.character);
-
       const std::string new_content = absl::StrCat(before, c.text, behind);
       // TODO: fix content document_length_
       LineVector regenerated_lines = GenerateLines(new_content);
@@ -83,7 +80,7 @@ private:
   // will not work with that.
   using LineVector = std::vector<std::shared_ptr<std::string>>;
 
-  LineVector GenerateLines(absl::string_view content) {
+  static LineVector GenerateLines(absl::string_view content) {
     LineVector result;
     for (const absl::string_view s : absl::StrSplit(content, '\n')) {
       result.emplace_back(new std::string(s));
@@ -91,11 +88,12 @@ private:
     }
 
     // Files that do or do not have a newline file-ending: represent correctly.
-    if (content.back() == '\n') {
+    if (!content.empty() && content.back() == '\n') {
       result.pop_back();
     } else {
       result.back()->pop_back();
     }
+
     return result;
   }
 

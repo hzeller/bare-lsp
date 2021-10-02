@@ -1,4 +1,3 @@
-
 #include "json-rpc-server.h"
 #include "message-stream-splitter.h"
 

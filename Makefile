@@ -1,12 +1,12 @@
 CXX=g++
 CXXFLAGS=-std=c++17 -O3 -W -Wall -Wextra -Wno-unused-parameter
-LDFLAGS=-labsl_strings -labsl_status
+LDFLAGS=-labsl_strings -labsl_status -labsl_throw_delegate
 SCHEMA_COMPILER=../jcxxgen/jcxxgen
 
 lsp-server: main.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-main.o: main.cc json-rpc-server.h lsp-protocol.h message-stream-splitter.h
+main.o: main.cc json-rpc-server.h lsp-protocol.h message-stream-splitter.h lsp-text-buffer.h
 
 json-rpc-server.h: lsp-protocol.h
 

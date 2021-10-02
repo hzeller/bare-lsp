@@ -5,6 +5,7 @@
 #include "message-stream-splitter.h"
 
 #include "lsp-protocol.h"
+#include "lsp-text-buffer.h"
 
 int main() {
   MessageStreamSplitter::ReadFun read_fun =
@@ -25,20 +26,26 @@ int main() {
     return server.DispatchMessage(body);
   });
 
+  BufferCollection buffers;
   server.AddNotificationHandler(
     "textDocument/didOpen",
-    [](const DidOpenTextDocumentParams &p) {
-      std::cerr << p.textDocument.languageId << "\n";
+    [&buffers](const DidOpenTextDocumentParams &p) {
+      buffers.EventOpen(p);
     });
   server.AddNotificationHandler(
     "textDocument/didSave",
-    [](const DidSaveTextDocumentParams &p) {
-      //std::cerr << "Save:" << p.textDocument.uri << "\n";
+    [&buffers](const DidSaveTextDocumentParams &p) {
+      buffers.EventSave(p);
     });
   server.AddNotificationHandler(
     "textDocument/didClose",
-    [](const DidSaveTextDocumentParams &p) {
-      //std::cerr << "Close:" << p.textDocument.uri << "\n";
+    [&buffers](const DidCloseTextDocumentParams &p) {
+      buffers.EventClose(p);
+    });
+  server.AddNotificationHandler(
+    "textDocument/didChange",
+    [&buffers](const DidChangeTextDocumentParams &p) {
+      buffers.EventChange(p);
     });
 
   server.AddRequestHandler(
@@ -49,20 +56,6 @@ int main() {
           .diagnostics = {},
         },
       };
-    });
-
-  server.AddNotificationHandler(
-    "textDocument/didChange",
-    [](const DidChangeTextDocumentParams &p) {
-      //std::cerr << "Change: " << p.textDocument.uri << "\n";
-      if (false) for (const auto &c : p.contentChanges) {
-        std::cerr << "  ["
-                  << c.range.start.line << "," << c.range.start.character
-                  << "-"
-                  << c.range.end.line << "," << c.range.end.character
-                  << "] '"
-                  << c.text << "'\n";
-      }
     });
 
   absl::Status status = absl::OkStatus();

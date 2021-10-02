@@ -2,8 +2,8 @@
 # Language Server Protocol as it is not entirely trivial.
 
 Position:
-  line: integer
-  character: integer
+  line: integer       # Zero based line
+  character: integer  # Zero based column
 
 Range:
   start: Position
@@ -31,10 +31,6 @@ TextDocumentItem:
   version: integer
   text: string
 
-VersionedTextDocumentIdentifier:
-  <:TextDocumentIdentifier
-  version: integer
-
 TextDocumentContentChangeEvent:
   range?: Range
   text: string
@@ -44,7 +40,7 @@ DidOpenTextDocumentParams:      # textDocument/didOpen
   textDocument: TextDocumentItem
 
 DidChangeTextDocumentParams:    # textDocument/didChange
-  textDocument: VersionedTextDocumentIdentifier
+  textDocument: TextDocumentIdentifier
   contentChanges+: TextDocumentContentChangeEvent
 
 DidSaveTextDocumentParams:      # textDocument/didSave

@@ -39,54 +39,81 @@ TEST(TextBufferTest, RecreateCRLFFiles) {
 
 TEST(TextBufferTest, ChangeApplyFullContent) {
   EditTextBuffer buffer("Foo\nBar\n");
-  buffer.ApplyChange({ .range = {}, .has_range = false, .text = "NewFile" });
+  const TextDocumentContentChangeEvent change = {
+    .range = {},
+    .has_range = false,
+    .text = "NewFile",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("NewFile", std::string(s));
   });
 }
 
-TEST(TextBufferTest, ChangeApplySingleLineInsert) {
+TEST(TextBufferTest, ChangeApplySingleLine_Insert) {
   EditTextBuffer buffer("Hello World");
-  buffer.ApplyChange({
-      .range = {
-        .start = { 0, 6 },
-        .end = { 0, 6 },
-      },
-      .has_range = true,
-      .text = "brave ",
-    });
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 0, 6 },
+      .end = { 0, 6 },
+    },
+    .has_range = true,
+    .text = "brave ",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  EXPECT_EQ(buffer.document_length(), 17);
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("Hello brave World", std::string(s));
   });
 }
 
-TEST(TextBufferTest, ChangeApplySingleLineReplace) {
+TEST(TextBufferTest, ChangeApplySingleLine_Replace) {
   EditTextBuffer buffer("Hello World\n");
-  buffer.ApplyChange({
-      .range = {
-        .start = { 0, 6 },
-        .end = { 0, 11},
-      },
-      .has_range = true,
-      .text = "Planet",
-    });
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 0, 6 },
+      .end = { 0, 11 },
+    },
+    .has_range = true,
+    .text = "Planet",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("Hello Planet\n", std::string(s));
   });
 }
 
-TEST(TextBufferTest, ChangeApplySingleLineReplaceNotFirstLine) {
+TEST(TextBufferTest, ChangeApplySingleLine_ReplaceNotFirstLine) {
+  // Make sure we properly access the right line.
   EditTextBuffer buffer("Hello World\nFoo\n");
-  buffer.ApplyChange({
-      .range = {
-        .start = { 1, 0 },
-        .end = { 1, 3},
-      },
-      .has_range = true,
-      .text = "Bar",
-    });
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 1, 0 },
+      .end = { 1, 3 },
+    },
+    .has_range = true,
+    .text = "Bar",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("Hello World\nBar\n", std::string(s));
+  });
+}
+
+TEST(TextBufferTest, ChangeApplySingleLine_Erase) {
+  EditTextBuffer buffer("Hello World\n");
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = {0, 5},
+      .end = {0, 11},
+    },
+    .has_range = true,
+    .text = "",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  EXPECT_EQ(buffer.document_length(), 6);
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("Hello\n", std::string(s));
   });
 }
 
@@ -102,7 +129,7 @@ TEST(TextBufferTest, ChangeApplySingleLineReplaceCorrectOverlongEnd) {
 
   {
     EditTextBuffer buffer("Hello World\n");
-    buffer.ApplyChange(change);
+    EXPECT_TRUE(buffer.ApplyChange(change));
     buffer.ProcessContent([&](absl::string_view s) {
       EXPECT_EQ("Hello Planet\n", std::string(s));
     });
@@ -110,9 +137,47 @@ TEST(TextBufferTest, ChangeApplySingleLineReplaceCorrectOverlongEnd) {
 
   {
     EditTextBuffer buffer("Hello World");
-    buffer.ApplyChange(change);
+    EXPECT_TRUE(buffer.ApplyChange(change));
     buffer.ProcessContent([&](absl::string_view s) {
       EXPECT_EQ("Hello Planet", std::string(s));
     });
   }
+}
+
+TEST(TextBufferTest, ChangeApplyMultiLineEraseBetweenLines) {
+  EditTextBuffer buffer("Hello\nWorld\n");
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 0, 2 },  // From here to end of line
+      .end = { 1, 0 },
+    },
+    .has_range = true,
+    .text = "y ",
+  };
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("Hey World\n", std::string(s));
+  });
+  // EXPECT_EQ(buffer.document_length(), 10);  // won't work yet.
+}
+
+
+TEST(TextBufferTest, ChangeApplyMultiLineInsertMoreLines) {
+  EditTextBuffer buffer("Hello\nbrave World\n");
+  const TextDocumentContentChangeEvent change = {
+    .range = {
+      .start = { 0, 2 },  // From here to end of line
+      .end = { 1, 5 },
+    },
+    .has_range = true,
+    .text = "y!\nThis will be a new line\nand more in this",
+  };
+  EXPECT_EQ(buffer.lines(), 2);
+  EXPECT_TRUE(buffer.ApplyChange(change));
+  EXPECT_EQ(buffer.lines(), 3);
+  buffer.ProcessContent([&](absl::string_view s) {
+    EXPECT_EQ("Hey!\nThis will be a new line\nand more in this World\n",
+              std::string(s));
+  });
+  // EXPECT_EQ(buffer.document_length(), 10);  // won't work yet.
 }

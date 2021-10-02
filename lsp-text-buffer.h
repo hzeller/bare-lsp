@@ -43,26 +43,35 @@ public:
     for (const auto &c : cc) ApplyChange(c);
   }
 
-  void ApplyChange(const TextDocumentContentChangeEvent &c) {
+  bool ApplyChange(const TextDocumentContentChangeEvent &c) {
     ++edit_count_;
     if (!c.has_range) {
       ReplaceDocument(c.text);
-      return;
+      return true;
     }
 
     if (c.range.start.line >= (int)lines_.size() ||
         c.range.end.line >= (int)lines_.size()) {
-      return;  // mmh
+      return false;  // mmh
     }
 
     if (c.range.start.line == c.range.end.line) {
-      EditLine(c, lines_[c.range.start.line].get());
+      return EditLine(c, lines_[c.range.start.line].get());
     } else {
-      std::cerr << "multiline " << c.range.start.line << ":"
-                << c.range.start.character << "-" << c.range.end.line << ":"
-                << c.range.end.character << " len:" << c.text.length() << "'"
-                << c.text << "'\n";
-      // we edit first line and
+      const absl::string_view start_line = *lines_[c.range.start.line];
+      const auto before = start_line.substr(0, c.range.start.character);
+
+      const absl::string_view end_line = *lines_[c.range.end.line];
+      const auto behind = end_line.substr(c.range.end.character);
+
+      const std::string new_content = absl::StrCat(before, c.text, behind);
+      // TODO: fix content document_length_
+      LineVector regenerated_lines = GenerateLines(new_content);
+      lines_.erase(lines_.begin() + c.range.start.line,
+                   lines_.begin() + c.range.end.line + 1);
+      lines_.insert(lines_.begin() + c.range.start.line,
+                    regenerated_lines.begin(), regenerated_lines.end());
+      return true;
     }
   }
 
@@ -70,40 +79,51 @@ public:
   int64_t document_length() const { return document_length_; }
 
 private:
-  void ReplaceDocument(absl::string_view content) {
-    document_length_ = content.length();
-    lines_.clear();
-    if (content.empty()) return;
+  // TODO: this should be unique_ptr, but assignment in the insert() command
+  // will not work with that.
+  using LineVector = std::vector<std::shared_ptr<std::string>>;
+
+  LineVector GenerateLines(absl::string_view content) {
+    LineVector result;
     for (const absl::string_view s : absl::StrSplit(content, '\n')) {
-      lines_.emplace_back(new std::string(s));
-      lines_.back()->append("\n");  // So that flattening works
+      result.emplace_back(new std::string(s));
+      result.back()->append("\n");
     }
+
     // Files that do or do not have a newline file-ending: represent correctly.
     if (content.back() == '\n') {
-      lines_.pop_back();
+      result.pop_back();
     } else {
-      lines_.back()->pop_back();
+      result.back()->pop_back();
     }
+    return result;
   }
 
-  void EditLine(const TextDocumentContentChangeEvent &c, std::string *str) {
+  void ReplaceDocument(absl::string_view content) {
+    document_length_ = content.length();
+    if (content.empty()) return;
+    lines_ = GenerateLines(content);
+  }
+
+  bool EditLine(const TextDocumentContentChangeEvent &c, std::string *str) {
     int end_char = c.range.end.character;
 
     const int str_end = str->back() == '\n' ? str->length()-1 : str->length();
-    if (c.range.start.character > str_end) return;  // TODO: error state ?
+    if (c.range.start.character > str_end) return false;
     if (end_char > str_end) end_char = str_end;
-
+    if (end_char < c.range.start.character) return false;
     document_length_ -= str->length();
-    absl::string_view assembly = *str;
-    absl::string_view before = assembly.substr(0, c.range.start.character);
-    absl::string_view behind = assembly.substr(end_char);
+    const absl::string_view assembly = *str;
+    const auto before = assembly.substr(0, c.range.start.character);
+    const auto behind = assembly.substr(end_char);
     *str = absl::StrCat(before, c.text, behind);
     document_length_ += str->length();
+    return true;
   }
 
   int64_t edit_count_ = 0;
   int64_t document_length_ = 0;  // might be approximate
-  std::vector<std::unique_ptr<std::string>> lines_;
+  LineVector lines_;
 };
 
 

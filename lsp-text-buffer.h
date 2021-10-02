@@ -29,14 +29,9 @@ class EditTextBuffer {
 public:
   EditTextBuffer(absl::string_view initial_text) {
     ReplaceDocument(initial_text);
-    std::cerr << "> Got file with " << lines_.size() << " lines\n";
   }
 
   ~EditTextBuffer() {
-    std::cerr << "< Closing buffer with " << edit_count_ << " edits\n";
-    ProcessContent([](absl::string_view s) {
-      std::cerr << "Final file content\n" << s;
-    });
   }
 
   // Requst to call function "processor" that gets a string_view that is
@@ -58,7 +53,6 @@ public:
     for (const auto &c : changes) {
       if (c.has_range) {
         while (c.range.start.line >= (int)lines_.size()) {
-          std::cerr << "insert new line\n";
           lines_.emplace_back(new std::string("\n"));
         }
         if (c.range.start.line == c.range.end.line) {

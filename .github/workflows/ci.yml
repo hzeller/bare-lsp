@@ -1,0 +1,27 @@
+name: 'main'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  linux:
+    name: Install Dependencies and Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt install -y libabsl-dev nlohmann-json3-dev
+
+      - name: Get the Source
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build and test
+        run: |
+          make lsp-server test

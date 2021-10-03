@@ -7,7 +7,9 @@ TEST(TextBufferTest, RecreateEmptyFile) {
   EditTextBuffer buffer("");
   EXPECT_EQ(buffer.lines(), 0);
   EXPECT_EQ(buffer.document_length(), 0);
-  buffer.ProcessContent([&](absl::string_view s) { EXPECT_TRUE(s.empty()); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_TRUE(s.empty());
+  });
 }
 
 TEST(TextBufferTest, RecreateFileWithAndWithoutNewlineAtEOF) {
@@ -21,8 +23,9 @@ TEST(TextBufferTest, RecreateFileWithAndWithoutNewlineAtEOF) {
     EditTextBuffer buffer(content);
     EXPECT_EQ(buffer.lines(), 3);
 
-    buffer.ProcessContent(
-        [&](absl::string_view s) { EXPECT_EQ(std::string(s), content); });
+    buffer.ProcessContent([&](absl::string_view s) {  //
+      EXPECT_EQ(std::string(s), content);
+    });
   }
 }
 
@@ -42,8 +45,9 @@ TEST(TextBufferTest, ChangeApplyFullContent) {
       .text = "NewFile",
   };
   EXPECT_TRUE(buffer.ApplyChange(change));
-  buffer.ProcessContent(
-      [&](absl::string_view s) { EXPECT_EQ("NewFile", std::string(s)); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_EQ("NewFile", std::string(s));
+  });
 }
 
 TEST(TextBufferTest, ChangeApplySingleLine_Insert) {
@@ -76,8 +80,9 @@ TEST(TextBufferTest, ChangeApplySingleLine_InsertFromEmptyFile) {
       .text = "New File!",
   };
   EXPECT_TRUE(buffer.ApplyChange(change));
-  buffer.ProcessContent(
-      [&](absl::string_view s) { EXPECT_EQ("New File!", std::string(s)); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_EQ("New File!", std::string(s));
+  });
 }
 
 TEST(TextBufferTest, ChangeApplySingleLine_Replace) {
@@ -128,8 +133,9 @@ TEST(TextBufferTest, ChangeApplySingleLine_Erase) {
   };
   EXPECT_TRUE(buffer.ApplyChange(change));
   EXPECT_EQ(buffer.document_length(), 6);
-  buffer.ProcessContent(
-      [&](absl::string_view s) { EXPECT_EQ("Hello\n", std::string(s)); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_EQ("Hello\n", std::string(s));
+  });
 }
 
 TEST(TextBufferTest, ChangeApplySingleLine_ReplaceCorrectOverlongEnd) {
@@ -171,8 +177,9 @@ TEST(TextBufferTest, ChangeApplyMultiLine_EraseBetweenLines) {
       .text = "y ",
   };
   EXPECT_TRUE(buffer.ApplyChange(change));
-  buffer.ProcessContent(
-      [&](absl::string_view s) { EXPECT_EQ("Hey World\n", std::string(s)); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_EQ("Hey World\n", std::string(s));
+  });
   EXPECT_EQ(buffer.document_length(), 10);  // won't work yet.
 }
 
@@ -192,8 +199,9 @@ TEST(TextBufferTest, ChangeApplyMultiLine_InsertMoreLines) {
   EXPECT_EQ(buffer.lines(), 3);
   static constexpr absl::string_view kExpected =
       "Hey!\nThis will be a new line\nand more in this World\n";
-  buffer.ProcessContent(
-      [&](absl::string_view s) { EXPECT_EQ(kExpected, std::string(s)); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_EQ(kExpected, std::string(s));
+  });
   EXPECT_EQ(buffer.document_length(), kExpected.length());
 }
 
@@ -231,7 +239,8 @@ TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
   EXPECT_EQ(buffer.lines(), 4);
   EXPECT_TRUE(buffer.ApplyChange(change));
   EXPECT_EQ(buffer.lines(), 2);
-  buffer.ProcessContent(
-      [&](absl::string_view s) { EXPECT_EQ("Foo\nQuux", std::string(s)); });
+  buffer.ProcessContent([&](absl::string_view s) {  //
+    EXPECT_EQ("Foo\nQuux", std::string(s));
+  });
   EXPECT_EQ(buffer.document_length(), 8);
 }

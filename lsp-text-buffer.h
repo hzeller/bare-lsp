@@ -17,14 +17,13 @@ class EditTextBuffer;
 
 class BufferCollection {
  public:
-  ~BufferCollection();
   void EventOpen(const DidOpenTextDocumentParams &o);
   void EventSave(const DidSaveTextDocumentParams &) {}
   void EventClose(const DidCloseTextDocumentParams &o);
   void EventChange(const DidChangeTextDocumentParams &o);
 
  private:
-  std::unordered_map<std::string, EditTextBuffer *> buffers_;
+  std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
 };
 
 class EditTextBuffer {
@@ -37,7 +36,7 @@ class EditTextBuffer {
 
   // Requst to call function "processor" that gets a string_view with the
   // current state that is valid for the duration of the call.
-  void ProcessContent(const ContentProcessFun &processor);
+  void ProcessContent(const ContentProcessFun &processor) const;
 
   void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &cc) {
     for (const auto &c : cc) ApplyChange(c);
@@ -59,7 +58,7 @@ class EditTextBuffer {
         c.text.find_first_of('\n') == std::string::npos) {
       return EditLine(c, lines_[c.range.start.line].get());
     } else {
-      // Multiline edit. Probably not the most optimal
+      // Multiline edit.
       const absl::string_view start_line = *lines_[c.range.start.line];
       const auto before = start_line.substr(0, c.range.start.character);
 
@@ -76,6 +75,7 @@ class EditTextBuffer {
                           });
       document_length_ += new_content.length();
       LineVector regenerated_lines = GenerateLines(new_content);
+      // Probably not the most optimal
       lines_.erase(before_begin, before_end);
       lines_.insert(lines_.begin() + c.range.start.line,
                     regenerated_lines.begin(), regenerated_lines.end());
@@ -143,7 +143,7 @@ inline void BufferCollection::EventOpen(const DidOpenTextDocumentParams &o) {
   auto inserted = buffers_.insert({o.textDocument.uri, nullptr});
   if (inserted.second) {
     std::cerr << "Open " << o.textDocument.uri << "\n";
-    inserted.first->second = new EditTextBuffer(o.textDocument.text);
+    inserted.first->second.reset(new EditTextBuffer(o.textDocument.text));
   }
 }
 
@@ -151,7 +151,6 @@ inline void BufferCollection::EventClose(const DidCloseTextDocumentParams &o) {
   auto found = buffers_.find(o.textDocument.uri);
   if (found == buffers_.end()) return;
   std::cerr << "Closing " << o.textDocument.uri << "\n";
-  delete found->second;
   buffers_.erase(found);
 }
 
@@ -162,11 +161,7 @@ inline void BufferCollection::EventChange(
   found->second->ApplyChanges(o.contentChanges);
 }
 
-inline BufferCollection::~BufferCollection() {
-  for (const auto &b : buffers_) delete b.second;
-}
-
-void EditTextBuffer::ProcessContent(const ContentProcessFun &processor) {
+void EditTextBuffer::ProcessContent(const ContentProcessFun &processor) const {
   std::string flat_view;
   flat_view.reserve(document_length_);
   for (const auto &l : lines_) flat_view.append(*l);

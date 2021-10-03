@@ -18,11 +18,12 @@ lsp-text-buffer_test: lsp-text-buffer_test.cc lsp-text-buffer.h lsp-protocol.h
 
 main.o: main.cc lsp-protocol.h json-rpc-server.h message-stream-splitter.h lsp-text-buffer.h
 
-main.cc:
-
 json-rpc-server.h: lsp-protocol.h
 
 lsp-protocol.h: lsp-protocol.yaml
+
+format:
+	clang-format -i *.cc *.h
 
 %.h : %.yaml $(SCHEMA_COMPILER)
 	$(SCHEMA_COMPILER) $< -o $@

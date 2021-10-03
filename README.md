@@ -47,7 +47,7 @@ bidirectional piping between processes and logs the data in a file that can
 be examined later. You could hook it up by writing a little shell-script like
 the one below and call that from your editor.
 
-```
+```bash
 #!/bin/bash
 
 DATE_SUFFIX=$(date +"%Y-%m-%d_%H%M")
@@ -66,8 +66,10 @@ So far implemented
   * Text document event handlers are implemented (`didOpen`, `didChange`,
     `didSave`, `didSave`). These take care of applying the edit-events to
     track the buffer content, ready to be used for language services.
+  * Demo implementation of RPC handlers
+     - Initialization (`initialize`, `initialized`)
+     - Sample hover command (`textDocument/hover`)
   * Prepared calling of linting etc. in idle time.
-  * No RPC handlers implemented yet, but ready to accept type-safe hooks.
 
 Pro-tip: Useful for testing and replaying sessions is the [bidi-tee] tool.
 

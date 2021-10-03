@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
   // Exchange of capabilities.
   dispatcher.AddRequestHandler("initialize", InitializeServer);
   dispatcher.AddNotificationHandler("initialized", [](const nlohmann::json &) {
-    std::cerr << "Initialized!\n";
+    std::cerr << "From client confirmed: Initialized!\n";
   });
 
   // The server will tell use to shut down but also notifies us on exit. Use

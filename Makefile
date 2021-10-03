@@ -13,10 +13,10 @@ test:  lsp-text-buffer_test
 lsp-server: main.o fd-mux.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-lsp-text-buffer_test: lsp-text-buffer_test.cc lsp-text-buffer.h
+lsp-text-buffer_test: lsp-text-buffer_test.cc lsp-text-buffer.h lsp-protocol.h
 	$(CXX) -o $@ $< $(CXXFLAGS) $(LDFLAGS) $(GTEST_LDFLAGS)
 
-main.o: main.cc lsp-protocol.h json-rpc-server.h lsp-protocol.h message-stream-splitter.h lsp-text-buffer.h
+main.o: main.cc lsp-protocol.h json-rpc-server.h message-stream-splitter.h lsp-text-buffer.h
 
 main.cc:
 
@@ -28,7 +28,7 @@ lsp-protocol.h: lsp-protocol.yaml
 	$(SCHEMA_COMPILER) $< -o $@
 
 $(SCHEMA_COMPILER):
-	make -C third_party/jcxxgen
+	$(MAKE) -C third_party/jcxxgen
 
 clean:
 	rm -f main.o lsp-protocol.h lsp-server lsp-text-buffer_test

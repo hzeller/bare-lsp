@@ -17,9 +17,9 @@
 //
 // The MessageStreamSplitter does not read data directly from a source but
 // gets handed a read function to get the data from. This allows to use this
-// in different environments from testing to making a select()-dispatcher.
-// The simplest implementation of the "ReadFun" just wraps a system read()
-// call.
+// in different environments from testing to using it with a filedescriptor
+// event dispatcher (select()).
+// The simplest implementation of the "ReadFun" just wraps a system read() call.
 //
 // The header data MUST contain a Content-Length header.
 class MessageStreamSplitter {
@@ -56,6 +56,11 @@ class MessageStreamSplitter {
   // the next amount of data and calls the message processor for each complete
   // message found. Partial data received is retained to be re-considered on
   // the next call to PullFrom().
+  //
+  // Within the context of this method, the message processor might be
+  // called zero to multiple times depending on how much data arrives from
+  // the read.
+  //
   // Returns with an ok status unless a processing error occurs.
   absl::Status PullFrom(const ReadFun &read_fun) {
     if (!message_processor_) {
@@ -84,7 +89,7 @@ class MessageStreamSplitter {
     auto end_of_header = data.find(kEndHeaderMarker);
     if (end_of_header == absl::string_view::npos) return -1;  // incomplete
 
-    // Very dirty search for header - we don't check if starts on line.
+    // Very dirty search for header - we don't check if starts with line.
     const absl::string_view header_content(data.data(), end_of_header);
     auto found_ContentLength_header = header_content.find(kContentLengthHeader);
     if (found_ContentLength_header == absl::string_view::npos) return -2;

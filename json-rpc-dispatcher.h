@@ -7,21 +7,20 @@
 #include <unordered_map>
 
 //
-#include <absl/status/status.h>
 #include <absl/strings/str_cat.h>
 #include <absl/strings/string_view.h>
 
 #include <nlohmann/json.hpp>
 
-// A Dispatcher that is fed JSON bodies, parses them to json and dispatches
-// the contained method call to pre-registered handlers.
+// A Dispatcher that is fed JSON as string, parses them to json objects and
+// dispatches the contained method call to pre-registered handlers.
 // Results of RPCCallHandlers are wrapped in a json rpc response object
 // and written out to the provided write function.
 //
 // This implements the JSON RPC specification [1].
 //
 // All receiving (call to DispatchMessage()) and writing of response (WriteFun)
-// is abstracted out to make the dispatcher agnostic of the actual transport.
+// is abstracted out to make the dispatcher agnostic of the transport layer.
 //
 // The RPCHandlers take and return json objects, but since nlohmann::json
 // provides ways to auto-convert objects to json, it is possible to

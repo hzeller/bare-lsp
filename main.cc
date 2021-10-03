@@ -1,16 +1,30 @@
 #include <unistd.h>
 
+#include "fd-mux.h"
 #include "json-rpc-server.h"
 #include "lsp-protocol.h"
 #include "lsp-text-buffer.h"
 #include "message-stream-splitter.h"
 
-int main() {
-  MessageStreamSplitter::ReadFun read_fun = [](char *buf, int size) -> int {
-    return read(STDIN_FILENO, buf, size);
-  };
+void PrintStats(const MessageStreamSplitter &source,
+                const JsonRpcServer &server) {
+  fprintf(stderr, "--------------- Statistic Counters Stats ---------------\n");
+  fprintf(stderr, "Total bytes : %9ld\n", source.StatTotalBytesRead());
+  fprintf(stderr, "Largest body: %9ld\n", source.StatLargestBodySeen());
 
+  fprintf(stderr, "\n--- Methods called ---\n");
+  int longest = 0;
+  for (const auto &stats : server.GetStatCounters()) {
+    longest = std::max(longest, (int)stats.first.length());
+  }
+  for (const auto &stats : server.GetStatCounters()) {
+    fprintf(stderr, "%*s %9d\n", longest, stats.first.c_str(), stats.second);
+  }
+}
+
+int main() {
   JsonRpcServer::WriteFun write_fun = [](absl::string_view reply) {
+    std::cout << "Content-Length: " << reply.size() << "\r\n\r\n";
     std::cout << reply;
   };
 
@@ -23,6 +37,8 @@ int main() {
       });
 
   BufferCollection buffers;
+
+  // Wire up the client notifications to the buffer
   server.AddNotificationHandler(
       "textDocument/didOpen",
       [&buffers](const DidOpenTextDocumentParams &p) { buffers.EventOpen(p); });
@@ -39,34 +55,26 @@ int main() {
         buffers.EventChange(p);
       });
 
-  server.AddRequestHandler(
-      "textDocument/codeAction",
-      [](const CodeActionParams &p) -> std::vector<CodeAction> {
-        return {
-            {
-                .title = "foo",
-                .diagnostics = {},
-            },
-        };
-      });
+  static constexpr int kIdleTimeout = 100;
+  FDMultiplexer file_multiplexer(kIdleTimeout);
 
-  absl::Status status = absl::OkStatus();
-  while (status.ok()) {
-    status = source.PullFrom(read_fun);
-  }
-  if (!status.ok()) std::cerr << status.message() << std::endl;
+  file_multiplexer.RunOnReadable(STDIN_FILENO, [&source]() {
+    absl::Status status = source.PullFrom([](char *buf, int size) -> int {
+      return read(STDIN_FILENO, buf, size);
+    });
+    return status.ok();
+  });
 
-  fprintf(stderr, "--------------- Statistic Counters Stats ---------------\n");
-  fprintf(stderr, "Total bytes : %9ld\n", source.StatTotalBytesRead());
-  fprintf(stderr, "Largest body: %9ld\n", source.StatLargestBodySeen());
+  file_multiplexer.RunOnIdle([]() {
+    // No editing going on in a while, so TODO let's go through all the buffers
+    // and do some linting and send some unsolicited diagnosis.
+    std::cerr << "Idle call\n";
+    return true;
+  });
 
-  fprintf(stderr, "\n--- Methods called ---\n");
-  int longest = 0;
-  for (const auto &stats : server.GetStatCounters()) {
-    longest = std::max(longest, (int)stats.first.length());
-  }
-  for (const auto &stats : server.GetStatCounters()) {
-    fprintf(stderr, "%*s %9d\n", longest, stats.first.c_str(), stats.second);
-  }
-  return status.ok() ? 0 : 1;
+  file_multiplexer.Loop();
+
+  PrintStats(source, server);
+
+  return 0;
 }

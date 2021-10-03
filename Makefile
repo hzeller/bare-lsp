@@ -6,7 +6,7 @@ SCHEMA_COMPILER=../jcxxgen/jcxxgen
 
 all: lsp-server lsp-text-buffer_test
 
-lsp-server: main.o
+lsp-server: main.o fd-mux.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 lsp-text-buffer_test: lsp-text-buffer_test.cc lsp-text-buffer.h

@@ -1,14 +1,15 @@
 // -*- c++ -*-
 #pragma once
 
-#include <absl/strings/str_cat.h>
-#include <absl/strings/str_split.h>
-#include <absl/strings/string_view.h>
-
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <vector>
+
+//
+#include <absl/strings/str_cat.h>
+#include <absl/strings/str_split.h>
+#include <absl/strings/string_view.h>
 
 #include "lsp-protocol.h"
 
@@ -27,7 +28,7 @@ class BufferCollection {
 };
 
 class EditTextBuffer {
-public:
+ public:
   using ContentProcessFun = std::function<void(absl::string_view)>;
 
   EditTextBuffer(absl::string_view initial_text) {
@@ -89,7 +90,7 @@ public:
   // as an ever increasing 'version number' of sorts.
   int64_t edit_count() const { return edit_count_; }
 
-private:
+ private:
   // TODO: this should be unique_ptr, but assignment in the insert() command
   // will not work. Needs to be formulated with something something std::move
   using LineVector = std::vector<std::shared_ptr<std::string>>;

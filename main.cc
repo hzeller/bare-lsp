@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
   JsonRpcDispatcher::WriteFun write_fun = [](absl::string_view reply) {
     // Output formatting as header/body chunk as required by LSP spec.
     std::cout << "Content-Length: " << reply.size() << "\r\n\r\n";
-    std::cout << reply;
+    std::cout << reply << std::flush;
   };
 
   MessageStreamSplitter stream_splitter(1 << 20);
@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
    * on idle is achieving this task and will also allow us to work
    * single-threaded easily.
    */
-  static constexpr int kIdleTimeout = 100;
-  FDMultiplexer file_multiplexer(kIdleTimeout);
+  static constexpr int kIdleTimeoutMs = 100;
+  FDMultiplexer file_multiplexer(kIdleTimeoutMs);
 
   // Whenever there is something to read from stdin, feed our message
   // to the stream splitter which will in turn call the JSON rpc dispatcher

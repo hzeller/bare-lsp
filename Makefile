@@ -2,9 +2,13 @@ CXX=g++
 CXXFLAGS=-std=c++17 -O3 -W -Wall -Wextra -Wno-unused-parameter
 LDFLAGS=-labsl_strings -labsl_status -labsl_throw_delegate
 GTEST_LDFLAGS=-lgtest -lgtest_main -lpthread
-SCHEMA_COMPILER=../jcxxgen/jcxxgen
 
-all: lsp-server lsp-text-buffer_test
+SCHEMA_COMPILER=third_party/jcxxgen/jcxxgen
+
+all: lsp-server
+
+test:  lsp-text-buffer_test
+	for f in $^ ; do ./$$f ; done
 
 lsp-server: main.o fd-mux.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
@@ -22,6 +26,9 @@ lsp-protocol.h: lsp-protocol.yaml
 
 %.h : %.yaml $(SCHEMA_COMPILER)
 	$(SCHEMA_COMPILER) $< -o $@
+
+$(SCHEMA_COMPILER):
+	make -C third_party/jcxxgen
 
 clean:
 	rm -f main.o lsp-protocol.h lsp-server lsp-text-buffer_test

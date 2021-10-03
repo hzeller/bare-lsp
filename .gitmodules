@@ -1,0 +1,3 @@
+[submodule "third_party/jcxxgen"]
+	path = third_party/jcxxgen
+	url = https://github.com/hzeller/jcxxgen

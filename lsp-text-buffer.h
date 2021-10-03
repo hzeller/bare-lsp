@@ -166,7 +166,7 @@ inline BufferCollection::~BufferCollection() {
 void EditTextBuffer::ProcessContent(
   const std::function<void(absl::string_view)> &processor) {
   std::string flat_view;
-  flat_view.reserve(document_length_ + 65535);
+  flat_view.reserve(document_length_);
   for (const auto &l : lines_) flat_view.append(*l);
   processor(flat_view);
 }

@@ -215,6 +215,7 @@ TEST(TextBufferTest, ChangeApplyMultiLine_InsertFromStart) {
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("This is now\na multiline\nfile\n", std::string(s));
   });
+  EXPECT_EQ(buffer.document_length(), change.text.length());
 }
 
 TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
@@ -233,4 +234,5 @@ TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("Foo\nQuux", std::string(s));
   });
+  EXPECT_EQ(buffer.document_length(), 8);
 }

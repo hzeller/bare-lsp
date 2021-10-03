@@ -1,45 +1,48 @@
 // -*- c++ -*-
 #pragma once
 
-#include <functional>
-#include <vector>
-#include <memory>
-#include <iostream>
-
 #include <absl/strings/str_cat.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/string_view.h>
+
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <vector>
 
 #include "lsp-protocol.h"
 
 class EditTextBuffer;
 
 class BufferCollection {
-public:
+ public:
   ~BufferCollection();
   void EventOpen(const DidOpenTextDocumentParams &o);
-  void EventSave(const DidSaveTextDocumentParams &){}
+  void EventSave(const DidSaveTextDocumentParams &) {}
   void EventClose(const DidCloseTextDocumentParams &o);
   void EventChange(const DidChangeTextDocumentParams &o);
 
-private:
-  std::unordered_map<std::string, EditTextBuffer*> buffers_;
+ private:
+  std::unordered_map<std::string, EditTextBuffer *> buffers_;
 };
 
 class EditTextBuffer {
 public:
+  using ContentProcessFun = std::function<void(absl::string_view)>;
+
   EditTextBuffer(absl::string_view initial_text) {
     ReplaceDocument(initial_text);
   }
 
-  // Requst to call function "processor" that gets a string_view that is
-  // valid for the duration of the call.
-  void ProcessContent(const std::function<void(absl::string_view)> &processor);
+  // Requst to call function "processor" that gets a string_view with the
+  // current state that is valid for the duration of the call.
+  void ProcessContent(const ContentProcessFun &processor);
 
   void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &cc) {
     for (const auto &c : cc) ApplyChange(c);
   }
 
+  // Apply a LSP edit operatation.
   bool ApplyChange(const TextDocumentContentChangeEvent &c) {
     ++edit_count_;
     if (!c.has_range) {
@@ -55,7 +58,7 @@ public:
         c.text.find_first_of('\n') == std::string::npos) {
       return EditLine(c, lines_[c.range.start.line].get());
     } else {
-      // Multiline edit.
+      // Multiline edit. Probably not the most optimal
       const absl::string_view start_line = *lines_[c.range.start.line];
       const auto before = start_line.substr(0, c.range.start.character);
 
@@ -64,12 +67,12 @@ public:
       const std::string new_content = absl::StrCat(before, c.text, behind);
 
       const auto before_begin = lines_.begin() + c.range.start.line;
-      const auto before_end  = lines_.begin() + c.range.end.line + 1;
-      document_length_ -= std::accumulate(
-        before_begin, before_end, 0,
-        [](int sum, const LineVector::value_type &line) {
-          return sum + line->length();
-        });
+      const auto before_end = lines_.begin() + c.range.end.line + 1;
+      document_length_ -=
+          std::accumulate(before_begin, before_end, 0,
+                          [](int sum, const LineVector::value_type &line) {
+                            return sum + line->length();
+                          });
       document_length_ += new_content.length();
       LineVector regenerated_lines = GenerateLines(new_content);
       lines_.erase(before_begin, before_end);
@@ -88,7 +91,7 @@ public:
 
 private:
   // TODO: this should be unique_ptr, but assignment in the insert() command
-  // will not work with that.
+  // will not work. Needs to be formulated with something something std::move
   using LineVector = std::vector<std::shared_ptr<std::string>>;
 
   static LineVector GenerateLines(absl::string_view content) {
@@ -117,7 +120,7 @@ private:
   bool EditLine(const TextDocumentContentChangeEvent &c, std::string *str) {
     int end_char = c.range.end.character;
 
-    const int str_end = str->back() == '\n' ? str->length()-1 : str->length();
+    const int str_end = str->back() == '\n' ? str->length() - 1 : str->length();
     if (c.range.start.character > str_end) return false;
     if (end_char > str_end) end_char = str_end;
     if (end_char < c.range.start.character) return false;
@@ -135,14 +138,13 @@ private:
   LineVector lines_;
 };
 
-
 inline void BufferCollection::EventOpen(const DidOpenTextDocumentParams &o) {
-    auto inserted = buffers_.insert({o.textDocument.uri, nullptr});
-    if (inserted.second) {
-      std::cerr << "Open " << o.textDocument.uri << "\n";
-      inserted.first->second = new EditTextBuffer(o.textDocument.text);
-    }
+  auto inserted = buffers_.insert({o.textDocument.uri, nullptr});
+  if (inserted.second) {
+    std::cerr << "Open " << o.textDocument.uri << "\n";
+    inserted.first->second = new EditTextBuffer(o.textDocument.text);
   }
+}
 
 inline void BufferCollection::EventClose(const DidCloseTextDocumentParams &o) {
   auto found = buffers_.find(o.textDocument.uri);
@@ -152,8 +154,8 @@ inline void BufferCollection::EventClose(const DidCloseTextDocumentParams &o) {
   buffers_.erase(found);
 }
 
-inline void BufferCollection::EventChange(const DidChangeTextDocumentParams &o)
-{
+inline void BufferCollection::EventChange(
+    const DidChangeTextDocumentParams &o) {
   auto found = buffers_.find(o.textDocument.uri);
   if (found == buffers_.end()) return;
   found->second->ApplyChanges(o.contentChanges);
@@ -163,8 +165,7 @@ inline BufferCollection::~BufferCollection() {
   for (const auto &b : buffers_) delete b.second;
 }
 
-void EditTextBuffer::ProcessContent(
-  const std::function<void(absl::string_view)> &processor) {
+void EditTextBuffer::ProcessContent(const ContentProcessFun &processor) {
   std::string flat_view;
   flat_view.reserve(document_length_);
   for (const auto &l : lines_) flat_view.append(*l);

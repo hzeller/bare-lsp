@@ -1,13 +1,13 @@
 #include <unistd.h>
 
 #include "fd-mux.h"
-#include "json-rpc-server.h"
+#include "json-rpc-dispatcher.h"
 #include "lsp-protocol.h"
 #include "lsp-text-buffer.h"
 #include "message-stream-splitter.h"
 
 void PrintStats(const MessageStreamSplitter &source,
-                const JsonRpcServer &server) {
+                const JsonRpcDispatcher &server) {
   fprintf(stderr, "--------------- Statistic Counters Stats ---------------\n");
   fprintf(stderr, "Total bytes : %9ld\n", source.StatTotalBytesRead());
   fprintf(stderr, "Largest body: %9ld\n", source.StatLargestBodySeen());
@@ -23,15 +23,16 @@ void PrintStats(const MessageStreamSplitter &source,
 }
 
 int main() {
-  JsonRpcServer::WriteFun write_fun = [](absl::string_view reply) {
+  JsonRpcDispatcher::WriteFun write_fun = [](absl::string_view reply) {
     std::cout << "Content-Length: " << reply.size() << "\r\n\r\n";
     std::cout << reply;
   };
 
-  MessageStreamSplitter source(1 << 20);
-  JsonRpcServer server(write_fun);
+  MessageStreamSplitter stream_splitter(1 << 20);
+  JsonRpcDispatcher server(write_fun);
 
-  source.SetMessageProcessor(
+  // All bodies the stream splitter extracts are pushed to the json dispatcher
+  stream_splitter.SetMessageProcessor(
       [&server](absl::string_view /*header*/, absl::string_view body) {
         return server.DispatchMessage(body);
       });
@@ -55,12 +56,15 @@ int main() {
         buffers.EventChange(p);
       });
 
+  const int in_fd = STDIN_FILENO;
   static constexpr int kIdleTimeout = 100;
   FDMultiplexer file_multiplexer(kIdleTimeout);
 
-  file_multiplexer.RunOnReadable(STDIN_FILENO, [&source]() {
-    absl::Status status = source.PullFrom([](char *buf, int size) -> int {
-      return read(STDIN_FILENO, buf, size);
+  // Whenever there is something to read from stdin, feed our message
+  // to the stream splitter which will in turn call the JSON rpc dispatcher
+  file_multiplexer.RunOnReadable(in_fd, [&stream_splitter, in_fd]() {
+    auto status = stream_splitter.PullFrom([in_fd](char *buf, int size) {
+      return read(in_fd, buf, size);
     });
     return status.ok();
   });
@@ -74,7 +78,7 @@ int main() {
 
   file_multiplexer.Loop();
 
-  PrintStats(source, server);
+  PrintStats(stream_splitter, server);
 
   return 0;
 }

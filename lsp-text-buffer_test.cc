@@ -18,7 +18,7 @@ TEST(TextBufferTest, RecreateFileWithAndWithoutNewlineAtEOF) {
       "\n"
       "Foo";
 
-  for (const absl::string_view append : {"", "\n"}) {
+  for (const absl::string_view append : {"", "\n", "\r\n"}) {
     const std::string &content = absl::StrCat(kBaseFile, append);
     EditTextBuffer buffer(content);
     EXPECT_EQ(buffer.lines(), 3);

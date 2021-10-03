@@ -61,6 +61,22 @@ DidSaveTextDocumentParams:      # textDocument/didSave
 DidCloseTextDocumentParams:     # textDocument/didClose
   textDocument: TextDocumentIdentifier
 
+# -- textDocument/hover
+TextDocumentPositionParams:
+  textDocument: TextDocumentIdentifier
+  position: Position
+
+HoverParams:
+  <: TextDocumentPositionParams
+
+MarkupContent:
+  kind: string = "markdown"
+  value: string
+
+Hover:
+  contents: MarkupContent
+  range?: Range
+
 # -- Code action
 CodeActionParams:              # textDocument/codeAction
   #<:WorkDoneProgressParams,

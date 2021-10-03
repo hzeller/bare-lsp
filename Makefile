@@ -32,4 +32,4 @@ $(SCHEMA_COMPILER):
 	$(MAKE) -C third_party/jcxxgen
 
 clean:
-	rm -f $(OBJECTS) lsp-protocol.h lsp-server lsp-text-buffer_test
+	rm -f *.o lsp-protocol.h lsp-server lsp-text-buffer_test

@@ -91,6 +91,24 @@ bool EditTextBuffer::EditLine(const TextDocumentContentChangeEvent &c,
   return true;
 }
 
+BufferCollection::BufferCollection(JsonRpcDispatcher *dispatcher) {
+  // Route notification events from the dispatcher to the buffer collection
+  // for them to keep track of what buffers are open and all of their edits
+  // they receive.
+  dispatcher->AddNotificationHandler(
+      "textDocument/didOpen",
+      [this](const DidOpenTextDocumentParams &p) { didOpenEvent(p); });
+  dispatcher->AddNotificationHandler(
+      "textDocument/didSave",
+      [this](const DidSaveTextDocumentParams &p) { didSaveEvent(p); });
+  dispatcher->AddNotificationHandler(
+      "textDocument/didClose",
+      [this](const DidCloseTextDocumentParams &p) { didCloseEvent(p); });
+  dispatcher->AddNotificationHandler(
+      "textDocument/didChange",
+      [this](const DidChangeTextDocumentParams &p) { didChangeEvent(p); });
+}
+
 void BufferCollection::didOpenEvent(const DidOpenTextDocumentParams &o) {
   auto inserted = buffers_.insert({o.textDocument.uri, nullptr});
   if (inserted.second) {
@@ -112,9 +130,18 @@ void BufferCollection::didChangeEvent(const DidChangeTextDocumentParams &o) {
   found->second->ApplyChanges(o.contentChanges);
 }
 
-void EditTextBuffer::ProcessContent(const ContentProcessFun &processor) const {
+void EditTextBuffer::RequestContent(const ContentProcessFun &processor) const {
   std::string flat_view;
   flat_view.reserve(document_length_);
   for (const auto &l : lines_) flat_view.append(*l);
   processor(flat_view);
+}
+
+void EditTextBuffer::RequestLine(int line,
+                                 const ContentProcessFun &processor) const {
+  if (line < 0 || line >= (int)lines_.size()) {
+    processor("");
+  } else {
+    processor(*lines_[line]);
+  }
 }

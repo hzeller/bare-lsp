@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <unistd.h>
 
 #include "fd-mux.h"
@@ -9,45 +10,63 @@
 void PrintStats(const MessageStreamSplitter &source,
                 const JsonRpcDispatcher &server);
 
-// Route notification events from the dispatcher to the buffer collection
-// for them to keep track of what buffers are open and all of their edits
-// they receive.
-void RegisterEditingEvents(BufferCollection *buffers,
-                           JsonRpcDispatcher *dispatcher) {
-  dispatcher->AddNotificationHandler(
-      "textDocument/didOpen", [buffers](const DidOpenTextDocumentParams &p) {
-        buffers->didOpenEvent(p);
-      });
-  dispatcher->AddNotificationHandler(
-      "textDocument/didSave", [buffers](const DidSaveTextDocumentParams &p) {
-        buffers->didSaveEvent(p);
-      });
-  dispatcher->AddNotificationHandler(
-      "textDocument/didClose", [buffers](const DidCloseTextDocumentParams &p) {
-        buffers->didCloseEvent(p);
-      });
-  dispatcher->AddNotificationHandler(
-      "textDocument/didChange",
-      [buffers](const DidChangeTextDocumentParams &p) {
-        buffers->didChangeEvent(p);
-      });
-}
-
-// Super-simplistic right now.
+// The "initialize" method requests server capabilities.
 InitializeResult InitializeServer(const nlohmann::json params) {
-  // super-simple
+  // Ignore passed client capabilities right now, just announce what we do.
   InitializeResult result;
   result.serverInfo = {
       .name = "Henner Zeller bare-lsp",
       .version = "0.1",
   };
-  result.capabilities = {{
-      "textDocumentSync",
+  result.capabilities = {
       {
-          {"openClose", true},  // Want open/close events
-          {"change", 2},        // Incremental updates
+          "textDocumentSync",
+          {
+              {"openClose", true},  // Want open/close events
+              {"change", 2},        // Incremental updates
+          },
       },
-  }};
+      {"hoverProvider", true},  // We provide textDocument/hover
+  };
+  return result;
+}
+
+// Example of a simple hover request: we just report how long the word
+// is we're hovering over.
+nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
+                                  const HoverParams &p) {
+  const EditTextBuffer *buffer = buffers.findBufferByUri(p.textDocument.uri);
+  if (!buffer) return nullptr;
+
+  const int col = p.position.character;
+  int word_length = -1;
+  Hover result;
+  result.range.start.line = result.range.end.line = p.position.line;
+  result.range.start.character = result.range.end.character = col;
+  buffer->RequestLine(
+      p.position.line, [&word_length, &result, col](absl::string_view line) {
+        if (col >= (int)line.length()) return;
+
+        // mark range.
+        int start = col;
+        while (start >= 0 && !isspace(line[start])) {
+          --start;
+        }
+        result.range.start.character = start;
+
+        int end = col;
+        while (end <= (int)line.length() && !isspace(line[end])) {
+          ++end;
+        }
+        result.range.end.character = end;
+        word_length = end - start - 1;
+      });
+  if (word_length < 0) return nullptr;
+
+  result.contents.value =
+      "A word with **" + std::to_string(word_length) + "** letters";
+  result.has_range = true;
+
   return result;
 }
 
@@ -70,9 +89,8 @@ int main(int argc, char *argv[]) {
       });
 
   // The buffer collection keeps track of all the buffers opened in the editor
-  // and dispatches edit events to it.
-  BufferCollection buffers;
-  RegisterEditingEvents(&buffers, &dispatcher);
+  // passes edit events it receives from the dispatcher to it.
+  BufferCollection buffers(&dispatcher);
 
   // Exchange of capabilities.
   dispatcher.AddRequestHandler("initialize", InitializeServer);
@@ -93,6 +111,11 @@ int main(int argc, char *argv[]) {
         shutdown_requested = true;
         return nullptr;
       });
+
+  dispatcher.AddRequestHandler("textDocument/hover",
+                               [&buffers](const HoverParams &p) {
+                                 return HandleHoverRequest(buffers, p);
+                               });
 
   /* For the actual processing, we want to do extra diagnostics in idle time
    * whenever we don't get updates for a while (i.e. user stopped typing)
@@ -118,7 +141,7 @@ int main(int argc, char *argv[]) {
   file_multiplexer.RunOnIdle([]() {
     // No editing going on in a while, so TODO let's go through all the buffers
     // and do some linting and send some diagnosis.
-    //std::cerr << "Idle call\n";  // TODO: actually do something :)
+    // std::cerr << "Idle call\n";  // TODO: actually do something :)
     return true;
   });
 

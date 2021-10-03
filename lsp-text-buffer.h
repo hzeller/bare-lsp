@@ -12,16 +12,25 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/string_view.h>
 
+#include "json-rpc-dispatcher.h"
 #include "lsp-protocol.h"
 
 class EditTextBuffer;
 
 class BufferCollection {
  public:
+  // Create buffer collection and subscribe to buffer events at the dispatcher.
+  BufferCollection(JsonRpcDispatcher *dispatcher);
+
   void didOpenEvent(const DidOpenTextDocumentParams &o);
   void didSaveEvent(const DidSaveTextDocumentParams &) {}
   void didCloseEvent(const DidCloseTextDocumentParams &o);
   void didChangeEvent(const DidChangeTextDocumentParams &o);
+
+  const EditTextBuffer *findBufferByUri(const std::string &uri) const {
+    auto found = buffers_.find(uri);
+    return found == buffers_.end() ? nullptr : found->second.get();
+  }
 
  private:
   std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
@@ -35,7 +44,8 @@ class EditTextBuffer {
 
   // Requst to call function "processor" that gets a string_view with the
   // current state that is valid for the duration of the call.
-  void ProcessContent(const ContentProcessFun &processor) const;
+  void RequestContent(const ContentProcessFun &processor) const;
+  void RequestLine(int line, const ContentProcessFun &processor) const;
 
   // Apply a single LSP edit operation.
   bool ApplyChange(const TextDocumentContentChangeEvent &c);

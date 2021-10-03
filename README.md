@@ -15,7 +15,7 @@ might need to be compiled separately.
 sudo apt install nlohmann-json3-dev libabsl-dev
 ```
 
-The [abseil] dependency is minimal (some string manipulation and absl::Status)
+The [abseil] dependency is minimal (some string manipulation and `absl::Status`)
 and it would be trivial to replace it with other similar library functionality
 if they are more common in the project to be used in.
 

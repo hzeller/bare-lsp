@@ -174,7 +174,7 @@ TEST(TextBufferTest, ChangeApplyMultiLine_EraseBetweenLines) {
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("Hey World\n", std::string(s));
   });
-  // EXPECT_EQ(buffer.document_length(), 10);  // won't work yet.
+  EXPECT_EQ(buffer.document_length(), 10);  // won't work yet.
 }
 
 
@@ -191,11 +191,12 @@ TEST(TextBufferTest, ChangeApplyMultiLine_InsertMoreLines) {
   EXPECT_EQ(buffer.lines(), 2);
   EXPECT_TRUE(buffer.ApplyChange(change));
   EXPECT_EQ(buffer.lines(), 3);
+  static constexpr absl::string_view kExpected =
+    "Hey!\nThis will be a new line\nand more in this World\n";
   buffer.ProcessContent([&](absl::string_view s) {
-    EXPECT_EQ("Hey!\nThis will be a new line\nand more in this World\n",
-              std::string(s));
+    EXPECT_EQ(kExpected, std::string(s));
   });
-  // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
+  EXPECT_EQ(buffer.document_length(), kExpected.length());
 }
 
 TEST(TextBufferTest, ChangeApplyMultiLine_InsertFromStart) {
@@ -214,7 +215,6 @@ TEST(TextBufferTest, ChangeApplyMultiLine_InsertFromStart) {
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("This is now\na multiline\nfile\n", std::string(s));
   });
-  // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
 }
 
 TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
@@ -233,5 +233,4 @@ TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
   buffer.ProcessContent([&](absl::string_view s) {
     EXPECT_EQ("Foo\nQuux", std::string(s));
   });
-  // EXPECT_EQ(buffer.document_length(), xxx);  // won't work yet.
 }

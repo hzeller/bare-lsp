@@ -62,10 +62,17 @@ public:
       const absl::string_view end_line = *lines_[c.range.end.line];
       const auto behind = end_line.substr(c.range.end.character);
       const std::string new_content = absl::StrCat(before, c.text, behind);
-      // TODO: fix content document_length_
+
+      const auto before_begin = lines_.begin() + c.range.start.line;
+      const auto before_end  = lines_.begin() + c.range.end.line + 1;
+      document_length_ -= std::accumulate(
+        before_begin, before_end, 0,
+        [](int sum, const LineVector::value_type &line) {
+          return sum + line->length();
+        });
+      document_length_ += new_content.length();
       LineVector regenerated_lines = GenerateLines(new_content);
-      lines_.erase(lines_.begin() + c.range.start.line,
-                   lines_.begin() + c.range.end.line + 1);
+      lines_.erase(before_begin, before_end);
       lines_.insert(lines_.begin() + c.range.start.line,
                     regenerated_lines.begin(), regenerated_lines.end());
       return true;
@@ -74,6 +81,10 @@ public:
 
   size_t lines() const { return lines_.size(); }
   int64_t document_length() const { return document_length_; }
+
+  // Number of edits applied to this document since the start. Can be used
+  // as an ever increasing 'version number' of sorts.
+  int64_t edit_count() const { return edit_count_; }
 
 private:
   // TODO: this should be unique_ptr, but assignment in the insert() command

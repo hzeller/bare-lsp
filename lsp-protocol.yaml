@@ -35,6 +35,18 @@ TextDocumentContentChangeEvent:
   range?: Range
   text: string
 
+# -- Initialize Request
+
+#InitializeParams:              # We handle that as plain json
+
+ServerInfo:
+  name: string
+  version: string
+
+InitializeResult:
+  capabilities: object          # Lots. We output that directly as plain json.
+  serverInfo: ServerInfo
+
 # -- Text document notifiations.
 DidOpenTextDocumentParams:      # textDocument/didOpen
   textDocument: TextDocumentItem

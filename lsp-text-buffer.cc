@@ -91,7 +91,7 @@ bool EditTextBuffer::EditLine(const TextDocumentContentChangeEvent &c,
   return true;
 }
 
-void BufferCollection::EventOpen(const DidOpenTextDocumentParams &o) {
+void BufferCollection::didOpenEvent(const DidOpenTextDocumentParams &o) {
   auto inserted = buffers_.insert({o.textDocument.uri, nullptr});
   if (inserted.second) {
     std::cerr << "Open " << o.textDocument.uri << "\n";
@@ -99,14 +99,14 @@ void BufferCollection::EventOpen(const DidOpenTextDocumentParams &o) {
   }
 }
 
-void BufferCollection::EventClose(const DidCloseTextDocumentParams &o) {
+void BufferCollection::didCloseEvent(const DidCloseTextDocumentParams &o) {
   auto found = buffers_.find(o.textDocument.uri);
   if (found == buffers_.end()) return;
   std::cerr << "Closing " << o.textDocument.uri << "\n";
   buffers_.erase(found);
 }
 
-void BufferCollection::EventChange(const DidChangeTextDocumentParams &o) {
+void BufferCollection::didChangeEvent(const DidChangeTextDocumentParams &o) {
   auto found = buffers_.find(o.textDocument.uri);
   if (found == buffers_.end()) return;
   found->second->ApplyChanges(o.contentChanges);

@@ -44,19 +44,21 @@ int main(int argc, char *argv[]) {
 
   // Wire up the client notifications to the buffer
   dispatcher.AddNotificationHandler(
-      "textDocument/didOpen",
-      [&buffers](const DidOpenTextDocumentParams &p) { buffers.EventOpen(p); });
+      "textDocument/didOpen", [&buffers](const DidOpenTextDocumentParams &p) {
+        buffers.didOpenEvent(p);
+      });
   dispatcher.AddNotificationHandler(
-      "textDocument/didSave",
-      [&buffers](const DidSaveTextDocumentParams &p) { buffers.EventSave(p); });
+      "textDocument/didSave", [&buffers](const DidSaveTextDocumentParams &p) {
+        buffers.didSaveEvent(p);
+      });
   dispatcher.AddNotificationHandler(
       "textDocument/didClose", [&buffers](const DidCloseTextDocumentParams &p) {
-        buffers.EventClose(p);
+        buffers.didCloseEvent(p);
       });
   dispatcher.AddNotificationHandler(
       "textDocument/didChange",
       [&buffers](const DidChangeTextDocumentParams &p) {
-        buffers.EventChange(p);
+        buffers.didChangeEvent(p);
       });
 
   /* For the actual processing, we want to do extra diagnostics in idle time

@@ -1,5 +1,6 @@
 // -*- c++ -*-
-#pragma once
+#ifndef LSP_TEXT_BUFFER_H
+#define LSP_TEXT_BUFFER_H
 
 #include <functional>
 #include <iostream>
@@ -17,10 +18,10 @@ class EditTextBuffer;
 
 class BufferCollection {
  public:
-  void EventOpen(const DidOpenTextDocumentParams &o);
-  void EventSave(const DidSaveTextDocumentParams &) {}
-  void EventClose(const DidCloseTextDocumentParams &o);
-  void EventChange(const DidChangeTextDocumentParams &o);
+  void didOpenEvent(const DidOpenTextDocumentParams &o);
+  void didSaveEvent(const DidSaveTextDocumentParams &) {}
+  void didCloseEvent(const DidCloseTextDocumentParams &o);
+  void didChangeEvent(const DidChangeTextDocumentParams &o);
 
  private:
   std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
@@ -36,10 +37,11 @@ class EditTextBuffer {
   // current state that is valid for the duration of the call.
   void ProcessContent(const ContentProcessFun &processor) const;
 
-  void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &cc);
-
-  // Apply a LSP edit operatation.
+  // Apply a single LSP edit operation.
   bool ApplyChange(const TextDocumentContentChangeEvent &c);
+
+  // Apply a sequence of changes.
+  void ApplyChanges(const std::vector<TextDocumentContentChangeEvent> &cc);
 
   // Lines in this document.
   size_t lines() const { return lines_.size(); }
@@ -64,3 +66,5 @@ class EditTextBuffer {
   int64_t document_length_ = 0;  // might be approximate
   LineVector lines_;
 };
+
+#endif  // LSP_TEXT_BUFFER_H

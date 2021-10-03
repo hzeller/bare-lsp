@@ -22,48 +22,59 @@ void PrintStats(const MessageStreamSplitter &source,
   }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+  // Input and output is stdin and stdout
+  static constexpr int in_fd = STDIN_FILENO;
   JsonRpcDispatcher::WriteFun write_fun = [](absl::string_view reply) {
+    // Output formatting as header/body chunk as required by LSP spec.
     std::cout << "Content-Length: " << reply.size() << "\r\n\r\n";
     std::cout << reply;
   };
 
   MessageStreamSplitter stream_splitter(1 << 20);
-  JsonRpcDispatcher server(write_fun);
+  JsonRpcDispatcher dispatcher(write_fun);
 
   // All bodies the stream splitter extracts are pushed to the json dispatcher
   stream_splitter.SetMessageProcessor(
-      [&server](absl::string_view /*header*/, absl::string_view body) {
-        return server.DispatchMessage(body);
+      [&dispatcher](absl::string_view /*header*/, absl::string_view body) {
+        return dispatcher.DispatchMessage(body);
       });
 
   BufferCollection buffers;
 
   // Wire up the client notifications to the buffer
-  server.AddNotificationHandler(
+  dispatcher.AddNotificationHandler(
       "textDocument/didOpen",
       [&buffers](const DidOpenTextDocumentParams &p) { buffers.EventOpen(p); });
-  server.AddNotificationHandler(
+  dispatcher.AddNotificationHandler(
       "textDocument/didSave",
       [&buffers](const DidSaveTextDocumentParams &p) { buffers.EventSave(p); });
-  server.AddNotificationHandler(
+  dispatcher.AddNotificationHandler(
       "textDocument/didClose", [&buffers](const DidCloseTextDocumentParams &p) {
         buffers.EventClose(p);
       });
-  server.AddNotificationHandler(
+  dispatcher.AddNotificationHandler(
       "textDocument/didChange",
       [&buffers](const DidChangeTextDocumentParams &p) {
         buffers.EventChange(p);
       });
 
-  const int in_fd = STDIN_FILENO;
+  /* For the actual processing, we want to do extra diagnostics in idle time
+   * whenever we don't get updates for a while (i.e. user stopped typing)
+   * and use that to analyze things that don't need immediage attention (e.g.
+   * linting warnings).
+   *
+   * Using a simple event manager that watches the input stream and calls
+   * on idle is achieving this task and will also allow us to work
+   * single-threaded easily.
+   */
   static constexpr int kIdleTimeout = 100;
   FDMultiplexer file_multiplexer(kIdleTimeout);
 
   // Whenever there is something to read from stdin, feed our message
   // to the stream splitter which will in turn call the JSON rpc dispatcher
-  file_multiplexer.RunOnReadable(in_fd, [&stream_splitter, in_fd]() {
-    auto status = stream_splitter.PullFrom([in_fd](char *buf, int size) {
+  file_multiplexer.RunOnReadable(in_fd, [&stream_splitter]() {
+    auto status = stream_splitter.PullFrom([](char *buf, int size) -> int {  //
       return read(in_fd, buf, size);
     });
     return status.ok();
@@ -71,14 +82,14 @@ int main() {
 
   file_multiplexer.RunOnIdle([]() {
     // No editing going on in a while, so TODO let's go through all the buffers
-    // and do some linting and send some unsolicited diagnosis.
-    std::cerr << "Idle call\n";
+    // and do some linting and send some diagnosis.
+    std::cerr << "Idle call\n";  // TODO: actually do something :)
     return true;
   });
 
   file_multiplexer.Loop();
 
-  PrintStats(stream_splitter, server);
+  PrintStats(stream_splitter, dispatcher);
 
   return 0;
 }

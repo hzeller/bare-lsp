@@ -1,5 +1,7 @@
 A barebone [LSP] implementation.
 
+Starting point for implementations.
+
 Dependencies:
 
 ```

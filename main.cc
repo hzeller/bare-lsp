@@ -52,6 +52,7 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
         while (start >= 0 && !isspace(line[start])) {
           --start;
         }
+        ++start;
         result.range.start.character = start;
 
         int end = col;
@@ -59,7 +60,7 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
           ++end;
         }
         result.range.end.character = end;
-        word_length = end - start - 1;
+        word_length = end - start;
       });
   if (word_length < 0) return nullptr;
 

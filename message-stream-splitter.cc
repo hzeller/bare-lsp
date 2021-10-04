@@ -84,6 +84,16 @@ absl::Status MessageStreamSplitter::ReadInput(const ReadFun &read_fun) {
 
   int bytes_read = read_fun(begin_of_read, available_read_space);
   if (bytes_read <= 0) {
+    // Got EOF.
+    // If we still have data pending, regard this as data loss situation, as
+    // we were never able to fully read the last message and send to process.
+    // Otherwise, report 'Unavailable' to indicate EOF (meh, this should
+    // be a better message).
+    if (!pending_data_.empty()) {
+      return absl::DataLossError(
+          absl::StrCat("Got EOF, but still have incomplete message with ",
+                       pending_data_.size(), "bytes read so far."));
+    }
     return absl::UnavailableError(absl::StrCat("read() returned ", bytes_read));
   }
   stats_total_bytes_read_ += bytes_read;

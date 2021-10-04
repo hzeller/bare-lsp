@@ -8,13 +8,16 @@ SCHEMA_COMPILER=third_party/jcxxgen/jcxxgen
 
 all: lsp-server
 
-test:  lsp-text-buffer_test
+test:  lsp-text-buffer_test message-stream-splitter_test
 	for f in $^ ; do ./$$f ; done
 
 lsp-server: main.o $(OBJECTS)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 lsp-text-buffer_test: lsp-text-buffer_test.o $(OBJECTS)
+	$(CXX) -o $@ $^ $(LDFLAGS) $(GTEST_LDFLAGS);
+
+message-stream-splitter_test: message-stream-splitter_test.o $(OBJECTS)
 	$(CXX) -o $@ $^ $(LDFLAGS) $(GTEST_LDFLAGS);
 
 main.o: main.cc lsp-protocol.h json-rpc-dispatcher.h message-stream-splitter.h lsp-text-buffer.h

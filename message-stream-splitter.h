@@ -63,7 +63,11 @@ class MessageStreamSplitter {
   // Note: The once-call behaviour allows to hook this into some file-descriptor
   // event dispatcher (e.g using select()).
   //
-  // Returns with an ok status unless a processing error occurs.
+  // Returns with an ok status until EOF or some error occurs.
+  // Code
+  //  - kUnavailable     : regular EOF, no data pending. A 'good' non-ok status.
+  //  - kDataloss        : got EOF, but still incomplete data pending.
+  //  - kInvalidargument : stream corrupted, couldn't read header.
   absl::Status PullFrom(const ReadFun &read_fun);
 
   // -- Statistical data

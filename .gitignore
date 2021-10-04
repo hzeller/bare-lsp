@@ -1,0 +1,5 @@
+*~
+*.o
+lsp-protocol.h
+*_test
+lsp-server

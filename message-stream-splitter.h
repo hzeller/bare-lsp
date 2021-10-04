@@ -1,4 +1,17 @@
-// -*- c++ -*-
+// Copyright 2021 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef MESSAGE_STREAM_SPLITTER_H
 #define MESSAGE_STREAM_SPLITTER_H
 
@@ -18,8 +31,9 @@
 //
 // The MessageStreamSplitter does not read data directly from a source but
 // gets handed a read function to get the data from. This allows to use this
-// in different environments from testing to using it with a filedescriptor
-// event dispatcher (select()).
+// in different environments from testing response to different behavior of the
+// read() to using it with a filedescriptor event dispatcher (select()).
+//
 // The simplest implementation of the "ReadFun" just wraps a system read() call.
 //
 // The header data MUST contain a Content-Length header.
@@ -41,7 +55,7 @@ class MessageStreamSplitter {
 
   // Read using an internal buffer of "read_buffer_size", which must be larger
   // than the largest expected message.
-  MessageStreamSplitter(size_t read_buffer_size)
+  explicit MessageStreamSplitter(size_t read_buffer_size)
       : read_buffer_size_(read_buffer_size),
         read_buffer_(new char[read_buffer_size]) {}
   MessageStreamSplitter(const MessageStreamSplitter &) = delete;
@@ -67,16 +81,17 @@ class MessageStreamSplitter {
   // Code
   //  - kUnavailable     : regular EOF, no data pending. A 'good' non-ok status.
   //  - kDataloss        : got EOF, but still incomplete data pending.
+  //  - kResourceExhausted: Buffer size chosen in constructor is not sufficient.
   //  - kInvalidargument : stream corrupted, couldn't read header.
   absl::Status PullFrom(const ReadFun &read_fun);
 
   // -- Statistical data
 
-  uint64_t StatLargestBodySeen() const { return stats_largest_body_; }
-  uint64_t StatTotalBytesRead() const { return stats_total_bytes_read_; }
+  size_t StatLargestBodySeen() const { return stats_largest_body_; }
+  size_t StatTotalBytesRead() const { return stats_total_bytes_read_; }
 
  private:
-  int ParseHeaderGetBodyOffset(absl::string_view data, int *body_size);
+  static int ParseHeaderGetBodyOffset(absl::string_view data, int *body_size);
   absl::Status ProcessContainedMessages(absl::string_view *data);
   absl::Status ReadInput(const ReadFun &read_fun);
 
@@ -86,8 +101,7 @@ class MessageStreamSplitter {
   MessageProcessFun message_processor_;
 
   size_t stats_largest_body_ = 0;
-  uint64_t stats_total_bytes_read_ = 0;
+  size_t stats_total_bytes_read_ = 0;
   absl::string_view pending_data_;
 };
-
 #endif  // MESSAGE_STREAM_SPLITTER_H

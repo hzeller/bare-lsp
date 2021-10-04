@@ -1,7 +1,22 @@
-#ifndef JSON_RPC_DISPATCHER_
-#define JSON_RPC_DISPATCHER_
+// Copyright 2021 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef JSON_RPC_DISPATCHER_H
+#define JSON_RPC_DISPATCHER_H
 
 #include <functional>
+#include <map>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -39,6 +54,11 @@
 // [2]: https://github.com/hzeller/jcxxgen
 class JsonRpcDispatcher {
  public:
+  // Magic constants defined in https://www.jsonrpc.org/specification
+  static constexpr int kParseError = -32700;
+  static constexpr int kMethodNotFound = -32601;
+  static constexpr int kInternalError = -32603;
+
   // A notification receives a request, but does not return anything
   using RPCNotification = std::function<void(const nlohmann::json &r)>;
 
@@ -56,19 +76,21 @@ class JsonRpcDispatcher {
   using StatsMap = std::map<std::string, int>;
 
   // Responses are written using the "out" write function.
-  JsonRpcDispatcher(const WriteFun &out) : write_fun_(out) {}
+  explicit JsonRpcDispatcher(const WriteFun &out) : write_fun_(out) {}
   JsonRpcDispatcher(const JsonRpcDispatcher &) = delete;
 
   // Add a request handler for RPC calls that receive data and send a response.
-  void AddRequestHandler(const std::string &method_name,
+  // Returns successful registration, false if that name is already registered.
+  bool AddRequestHandler(const std::string &method_name,
                          const RPCCallHandler &fun) {
-    handlers_.insert({method_name, fun});
+    return handlers_.insert({method_name, fun}).second;
   }
 
   // Add a request handler for RPC Notifications, that are receive-only events.
-  void AddNotificationHandler(const std::string &method_name,
+  // Returns successful registration, false if that name is already registered.
+  bool AddNotificationHandler(const std::string &method_name,
                               const RPCNotification &fun) {
-    notifications_.insert({method_name, fun});
+    return notifications_.insert({method_name, fun}).second;
   }
 
   // Dispatch incoming message, a string view with json data.
@@ -76,8 +98,15 @@ class JsonRpcDispatcher {
   // If this is an RPC call, response will call WriteFun.
   void DispatchMessage(absl::string_view data);
 
-  // Get some statistical counters of methods called and exceptions encountered.
+  // Get some human-readable statistical counters of methods called
+  // and exception messages encountered.
   const StatsMap &GetStatCounters() const { return statistic_counters_; }
+
+  // Number of exceptions that have been dealt with and turned into error
+  // messages or ignored depending on the context.
+  // The counters returned by GetStatsCounters() will report counts by
+  // exception message.
+  int exception_count() const { return exception_count_; }
 
  private:
   bool CallNotification(const nlohmann::json &req, const std::string &method);
@@ -93,7 +122,7 @@ class JsonRpcDispatcher {
 
   std::unordered_map<std::string, RPCCallHandler> handlers_;
   std::unordered_map<std::string, RPCNotification> notifications_;
+  int exception_count_ = 0;
   StatsMap statistic_counters_;
 };
-
-#endif  // JSON_RPC_DISPATCHER_
+#endif  // JSON_RPC_DISPATCHER_H

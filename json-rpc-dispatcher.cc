@@ -1,18 +1,26 @@
+// Copyright 2021 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "json-rpc-dispatcher.h"
 
-static constexpr int kParseError = -32700;
-static constexpr int kMethodNotFound = -32601;
-static constexpr int kInternalError = -32603;
-
-// Dispatch incoming message, a string view with json data.
-// Call this with the content of exactly one message.
-// If this is an RPC call, it send the response via the WriteFun.
 void JsonRpcDispatcher::DispatchMessage(absl::string_view data) {
   nlohmann::json request;
   try {
     request = nlohmann::json::parse(data);
   } catch (const std::exception &e) {
     statistic_counters_[e.what()]++;
+    ++exception_count_;
     SendReply(CreateError(request, kParseError, e.what()));
     return;
   }
@@ -25,7 +33,7 @@ void JsonRpcDispatcher::DispatchMessage(absl::string_view data) {
   }
   const std::string &method = request["method"];
 
-  // Direct dispatch, later maybe send to thread-pool ?
+  // Direct dispatch, later maybe send to an executor that returns futures ?
   const bool is_notification = (request.find("id") == request.end());
   bool handled = false;
   if (is_notification) {
@@ -45,7 +53,7 @@ bool JsonRpcDispatcher::CallNotification(const nlohmann::json &req,
     found->second(req["params"]);
     return true;
   } catch (const std::exception &e) {
-    // Possibly issue while implicitly converting from json to type.
+    ++exception_count_;
     statistic_counters_[method + " : " + e.what()]++;
   }
   return false;
@@ -64,6 +72,7 @@ bool JsonRpcDispatcher::CallRequestHandler(const nlohmann::json &req,
     SendReply(MakeResponse(req, found->second(req["params"])));
     return true;
   } catch (const std::exception &e) {
+    ++exception_count_;
     statistic_counters_[method + " : " + e.what()]++;
     SendReply(CreateError(req, kInternalError, e.what()));
   }

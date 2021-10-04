@@ -1,3 +1,17 @@
+// Copyright 2021 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "message-stream-splitter.h"
 
 #include <absl/status/status.h>
@@ -11,6 +25,8 @@ using ::testing::HasSubstr;
 
 TEST(MessageStreamSplitterTest, NotRegisteredMessageProcessor) {
   MessageStreamSplitter s(4096);
+  // We need to have had a message processor registered before, otherwise
+  // the read would not know where to send results.
   auto status = s.PullFrom([](char *, int) { return 0; });
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kFailedPrecondition);
@@ -64,6 +80,28 @@ TEST(MessageStreamSplitterTest, CompleteReadValidMessage) {
   EXPECT_EQ(status.code(), absl::StatusCode::kUnavailable);
 
   EXPECT_EQ(processor_call_count, 1);  // No additional calls recorded here.
+}
+
+TEST(MessageStreamSplitterTest, BufferSizeTooSmall) {
+  static constexpr absl::string_view kHeader = "Content-Length: 3\r\n\r\n";
+  static constexpr absl::string_view kBody = "foo";
+
+  DataStreamSimulator stream(absl::StrCat(kHeader, kBody));
+  MessageStreamSplitter s(10);  // Way too small buffer.
+  int processor_call_count = 0;
+  s.SetMessageProcessor([&](absl::string_view header, absl::string_view body) {
+    ++processor_call_count;
+  });
+
+  absl::Status status = absl::OkStatus();
+  while (status.ok()) {
+    status =
+        s.PullFrom([&](char *buf, int size) { return stream.read(buf, size); });
+  }
+
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
+  EXPECT_EQ(processor_call_count, 0);
 }
 
 TEST(MessageStreamSplitterTest, StreamDoesNotContainCompleteData) {
@@ -135,7 +173,7 @@ TEST(MessageStreamSplitterTest, CompleteReadMultipleMessagesShortRead) {
 
   // Read until we reached EOF, indicated as kUnavailable
   EXPECT_EQ(status.code(), absl::StatusCode::kUnavailable);  // EOF
-  EXPECT_GT(read_call_count, 10);  // this requires a few read calls.
+  EXPECT_GT(read_call_count, 10);  // Just checking that it is significantly > 1
   EXPECT_EQ(processor_call_count, 2);
 }
 

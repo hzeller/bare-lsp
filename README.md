@@ -12,7 +12,7 @@ for string utility functions and an error code abstraction.
 libabsl-dev is available in current Debian testing, but on other platforms it
 might need to be compiled separately.
 ```
-sudo apt install nlohmann-json3-dev libabsl-dev
+sudo apt install nlohmann-json3-dev libabsl-dev libgtest-dev libgmock-dev
 ```
 
 The [abseil] dependency is minimal (some string manipulation and `absl::Status`)

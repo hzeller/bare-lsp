@@ -55,7 +55,7 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
         result.range.start.character = start;
 
         int end = col;
-        while (end <= (int)line.length() && !isspace(line[end])) {
+        while (end < (int)line.length() && !isspace(line[end])) {
           ++end;
         }
         result.range.end.character = end;

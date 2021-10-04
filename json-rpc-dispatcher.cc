@@ -45,7 +45,7 @@ bool JsonRpcDispatcher::CallNotification(const nlohmann::json &req,
     found->second(req["params"]);
     return true;
   } catch (const std::exception &e) {
-    // Issue while implicitly converting from json to type.
+    // Possibly issue while implicitly converting from json to type.
     statistic_counters_[method + " : " + e.what()]++;
   }
   return false;

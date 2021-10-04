@@ -31,7 +31,7 @@
 // With that, you then can register fully typed handlers with seamless
 // conversion
 // dispatcer.AddRequestHandler("MyMethod",
-//                             [](const MyParamType &p) -> MyReponseType {
+//                             [](const MyParamType &p) -> MyResponseType {
 //                               return doSomething(p);
 //                             });
 //
@@ -73,7 +73,7 @@ class JsonRpcDispatcher {
 
   // Dispatch incoming message, a string view with json data.
   // Call this with the content of exactly one message.
-  // If this is an RPC call, it send the response via the WriteFun.
+  // If this is an RPC call, response will call WriteFun.
   void DispatchMessage(absl::string_view data);
 
   // Get some statistical counters of methods called and exceptions encountered.

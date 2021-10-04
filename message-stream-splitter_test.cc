@@ -1,11 +1,11 @@
 #include "message-stream-splitter.h"
 
-#include <algorithm>
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
-
 #include <absl/status/status.h>
 #include <absl/strings/string_view.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <algorithm>
 
 using ::testing::HasSubstr;
 
@@ -19,10 +19,9 @@ TEST(MessageStreamSplitterTest, NotRegisteredMessageProcessor) {
 // A stream simulator that is pre-filled with data and allows to
 // simulate partial reads.
 class DataStreamSimulator {
-public:
-  DataStreamSimulator(absl::string_view content,
-                      int max_chunk = -1)
-    : content_(content), max_chunk_(max_chunk) {}
+ public:
+  DataStreamSimulator(absl::string_view content, int max_chunk = -1)
+      : content_(content), max_chunk_(max_chunk) {}
 
   int read(char *buf, int size) {
     if (max_chunk_ > 0 && size > max_chunk_) size = max_chunk_;
@@ -32,7 +31,7 @@ public:
     return size;
   }
 
-private:
+ private:
   const std::string content_;
   const int max_chunk_;
   int read_pos_ = 0;
@@ -51,9 +50,8 @@ TEST(MessageStreamSplitterTest, CompleteReadValidMessage) {
     EXPECT_EQ(std::string(body), kBody);
   });
 
-  auto status = s.PullFrom([&](char *buf, int size) {
-    return stream.read(buf, size);
-  });
+  auto status =
+      s.PullFrom([&](char *buf, int size) { return stream.read(buf, size); });
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(processor_call_count, 1);
 
@@ -75,15 +73,13 @@ TEST(MessageStreamSplitterTest, StreamDoesNotContainCompleteData) {
   DataStreamSimulator stream(absl::StrCat(kHeader, kBody));
   MessageStreamSplitter s(4096);
   int processor_call_count = 0;
-  s.SetMessageProcessor([&](absl::string_view, absl::string_view) {
-    ++processor_call_count;
-  });
+  s.SetMessageProcessor(
+      [&](absl::string_view, absl::string_view) { ++processor_call_count; });
 
   absl::Status status = absl::OkStatus();
   while (status.ok()) {
-    status = s.PullFrom([&](char *buf, int size) {
-      return stream.read(buf, size);
-    });
+    status =
+        s.PullFrom([&](char *buf, int size) { return stream.read(buf, size); });
   }
 
   // We reached EOF, but we still have data pending. Reported as data loss.
@@ -95,10 +91,10 @@ TEST(MessageStreamSplitterTest, StreamDoesNotContainCompleteData) {
 
 TEST(MessageStreamSplitterTest, CompleteReadMultipleMessages) {
   static constexpr absl::string_view kHeader = "Content-Length: 3\r\n\r\n";
-  static constexpr absl::string_view kBody[2] = { "foo", "bar" };
+  static constexpr absl::string_view kBody[2] = {"foo", "bar"};
 
-  DataStreamSimulator stream(absl::StrCat(kHeader, kBody[0],
-                                          kHeader, kBody[1]));
+  DataStreamSimulator stream(
+      absl::StrCat(kHeader, kBody[0], kHeader, kBody[1]));
   MessageStreamSplitter s(4096);
   int processor_call_count = 0;
   // We expect one call per complete header/body pair.
@@ -113,15 +109,13 @@ TEST(MessageStreamSplitterTest, CompleteReadMultipleMessages) {
   EXPECT_EQ(processor_call_count, 2);
 }
 
-
 // Simulate short reads. Each read call only trickles out a few bytes.
 TEST(MessageStreamSplitterTest, CompleteReadMultipleMessagesShortRead) {
   static constexpr absl::string_view kHeader = "Content-Length: 3\r\n\r\n";
-  static constexpr absl::string_view kBody[2] = { "foo", "bar" };
+  static constexpr absl::string_view kBody[2] = {"foo", "bar"};
   static constexpr int kTrickleReadSize = 2;
 
-  DataStreamSimulator stream(absl::StrCat(kHeader, kBody[0],
-                                          kHeader, kBody[1]),
+  DataStreamSimulator stream(absl::StrCat(kHeader, kBody[0], kHeader, kBody[1]),
                              kTrickleReadSize);
   MessageStreamSplitter s(4096);
   int processor_call_count = 0;
@@ -135,9 +129,8 @@ TEST(MessageStreamSplitterTest, CompleteReadMultipleMessagesShortRead) {
   absl::Status status = absl::OkStatus();
   while (status.ok()) {
     ++read_call_count;
-    status = s.PullFrom([&](char *buf, int size) {
-      return stream.read(buf, size);
-    });
+    status =
+        s.PullFrom([&](char *buf, int size) { return stream.read(buf, size); });
   }
 
   // Read until we reached EOF, indicated as kUnavailable
@@ -145,7 +138,6 @@ TEST(MessageStreamSplitterTest, CompleteReadMultipleMessagesShortRead) {
   EXPECT_GT(read_call_count, 10);  // this requires a few read calls.
   EXPECT_EQ(processor_call_count, 2);
 }
-
 
 TEST(MessageStreamSplitterTest, NotAvailableContentHeaderReadError) {
   static constexpr absl::string_view kHeader = "not-content-length: 3\r\n\r\n";
@@ -157,9 +149,8 @@ TEST(MessageStreamSplitterTest, NotAvailableContentHeaderReadError) {
   s.SetMessageProcessor([&](absl::string_view header, absl::string_view body) {
     ++processor_call_count;
   });
-  auto status = s.PullFrom([&](char *buf, int size) {
-    return stream.read(buf, size);
-  });
+  auto status =
+      s.PullFrom([&](char *buf, int size) { return stream.read(buf, size); });
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(status.message(), HasSubstr("header"));
@@ -176,9 +167,8 @@ TEST(MessageStreamSplitterTest, GarbledSizeInContentHeader) {
   s.SetMessageProcessor([&](absl::string_view header, absl::string_view body) {
     ++processor_call_count;
   });
-  auto status = s.PullFrom([&](char *buf, int size) {
-    return stream.read(buf, size);
-  });
+  auto status =
+      s.PullFrom([&](char *buf, int size) { return stream.read(buf, size); });
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(status.message(), HasSubstr("header"));

@@ -1,7 +1,22 @@
+// Copyright 2021 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "lsp-text-buffer.h"
 
 #include <absl/strings/str_cat.h>
-#include <gtest/gtest.h>
+#include "json-rpc-dispatcher.h"
+#include "gtest/gtest.h"
 
 TEST(TextBufferTest, RecreateEmptyFile) {
   EditTextBuffer buffer("");
@@ -262,4 +277,65 @@ TEST(TextBufferTest, ChangeApplyMultiLine_RemoveLines) {
     EXPECT_EQ("Foo\nQuux", std::string(s));
   });
   EXPECT_EQ(buffer.document_length(), 8);
+}
+
+TEST(BufferCollection, SimulateDocumentLifecycleThroughRPC) {
+  // Let's walk a BufferCollection through the lifecycle of a document
+  // by sending it the JSON RPC notifications for open, change and close.
+  //
+  // Inspect at each step that the content and number of documents is what
+  // we expect.
+
+  // Notifications don't send any responses; write function not relevant.
+  JsonRpcDispatcher rpc_dispatcher([](absl::string_view) {});
+  BufferCollection collection(&rpc_dispatcher);
+
+  EXPECT_EQ(collection.documents_open(), 0);
+
+  // ------ Opening new document
+  // Simulate an incoming event from the client
+  rpc_dispatcher.DispatchMessage(R"({
+    "jsonrpc":"2.0",
+    "method":"textDocument/didOpen",
+    "params":{
+        "textDocument":{
+           "uri": "file:///foo.cc",
+           "text": "Hello\nworld",
+           "languageId": "cpp",
+           "version": 1
+         }
+    }})");
+
+  // We now expect one document to be open.
+  EXPECT_EQ(collection.documents_open(), 1);
+
+  // Request content with the document URI and check that it is as sent.
+  collection.findBufferByUri("file:///foo.cc")
+      ->RequestContent([](absl::string_view s) {
+        EXPECT_EQ(std::string(s), "Hello\nworld");
+      });
+
+  // ------ Editing document: receive content changes
+  rpc_dispatcher.DispatchMessage(R"({
+    "jsonrpc":"2.0",
+    "method":"textDocument/didChange",
+    "params":{
+        "textDocument":   { "uri": "file:///foo.cc" },
+        "contentChanges": [ {"text":"Hey"} ]
+     }})");
+
+  collection.findBufferByUri("file:///foo.cc")
+      ->RequestContent(
+          [](absl::string_view s) { EXPECT_EQ(std::string(s), "Hey"); });
+
+  // ------ Closing document
+  rpc_dispatcher.DispatchMessage(R"({
+    "jsonrpc":"2.0",
+    "method":"textDocument/didClose",
+    "params":{
+        "textDocument":{ "uri": "file:///foo.cc" }
+     }})");
+
+  // No document open anymore
+  EXPECT_EQ(collection.documents_open(), 0);
 }

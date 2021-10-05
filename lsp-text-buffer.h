@@ -1,9 +1,21 @@
-// -*- c++ -*-
+// Copyright 2021 Henner Zeller <h.zeller@acm.org>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef LSP_TEXT_BUFFER_H
 #define LSP_TEXT_BUFFER_H
 
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -15,36 +27,24 @@
 #include "json-rpc-dispatcher.h"
 #include "lsp-protocol.h"
 
-class EditTextBuffer;
-
-class BufferCollection {
- public:
-  // Create buffer collection and subscribe to buffer events at the dispatcher.
-  BufferCollection(JsonRpcDispatcher *dispatcher);
-
-  void didOpenEvent(const DidOpenTextDocumentParams &o);
-  void didSaveEvent(const DidSaveTextDocumentParams &) {}
-  void didCloseEvent(const DidCloseTextDocumentParams &o);
-  void didChangeEvent(const DidChangeTextDocumentParams &o);
-
-  const EditTextBuffer *findBufferByUri(const std::string &uri) const {
-    auto found = buffers_.find(uri);
-    return found == buffers_.end() ? nullptr : found->second.get();
-  }
-
- private:
-  std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
-};
-
+// The EditTextBuffer keeps track of the content of buffers on the client.
+// It is fed initially with the full content, and from then on receives
+// change events to keep in sync.
+// It provides ways to pass the current content to a requestor that needs to
+// process it.
 class EditTextBuffer {
  public:
   using ContentProcessFun = std::function<void(absl::string_view)>;
 
-  EditTextBuffer(absl::string_view initial_text);
+  explicit EditTextBuffer(absl::string_view initial_text);
+  EditTextBuffer(const EditTextBuffer &) = delete;
 
-  // Requst to call function "processor" that gets a string_view with the
-  // current state that is valid for the duration of the call.
+  // Requst to flatten the content call and call function "processor" that
+  // gets a string_view of the current state that is valid for the duration
+  // of the call.
   void RequestContent(const ContentProcessFun &processor) const;
+
+  // Same as RequestContent() for a specific line.
   void RequestLine(int line, const ContentProcessFun &processor) const;
 
   // Apply a single LSP edit operation.
@@ -65,16 +65,46 @@ class EditTextBuffer {
 
  private:
   // TODO: this should be unique_ptr, but assignment in the insert() command
-  // will not work. Needs to be formulated with something something std::move
+  // will not work. Needs to be formulated with something something std::move ?
   using LineVector = std::vector<std::shared_ptr<std::string>>;
 
   static LineVector GenerateLines(absl::string_view content);
   void ReplaceDocument(absl::string_view content);
-  bool EditLine(const TextDocumentContentChangeEvent &c, std::string *str);
+  bool LineEdit(const TextDocumentContentChangeEvent &c, std::string *str);
+  bool MultiLineEdit(const TextDocumentContentChangeEvent &c);
 
   int64_t edit_count_ = 0;
-  int64_t document_length_ = 0;  // might be approximate
+  int64_t document_length_ = 0;
   LineVector lines_;
+};
+
+// A buffer collection keeps track of various open text buffers on the
+// client side. Registers new ExitTextBuffers by subscribing to events
+// coming from the client.
+class BufferCollection {
+ public:
+  // Create buffer collection and subscribe to buffer events at the dispatcher.
+  explicit BufferCollection(JsonRpcDispatcher *dispatcher);
+  BufferCollection(const BufferCollection &) = delete;
+
+  // Handle textDocument/didOpen event; create a new EditTextBuffer.
+  void didOpenEvent(const DidOpenTextDocumentParams &o);
+
+  // Handle textDocument/didChange event. Delegate changes to existing buffer.
+  void didChangeEvent(const DidChangeTextDocumentParams &o);
+
+  // Handle textDocument/didClose event. Forget about buffer.
+  void didCloseEvent(const DidCloseTextDocumentParams &o);
+
+  const EditTextBuffer *findBufferByUri(const std::string &uri) const {
+    auto found = buffers_.find(uri);
+    return found == buffers_.end() ? nullptr : found->second.get();
+  }
+
+  size_t documents_open() const { return buffers_.size(); }
+
+ private:
+  std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
 };
 
 #endif  // LSP_TEXT_BUFFER_H

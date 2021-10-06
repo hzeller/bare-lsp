@@ -16,8 +16,10 @@
 
 #include <unistd.h>
 
-#include "gtest/gtest.h"
+//
 #include <absl/strings/string_view.h>
+
+#include "gtest/gtest.h"
 
 TEST(FdMuxTest, IdleAndReadableCallHandled) {
   // To be able to do this test just in the main thread, we
@@ -30,7 +32,7 @@ TEST(FdMuxTest, IdleAndReadableCallHandled) {
   // wakes up the reader.
   static constexpr absl::string_view kMessage = "Hello";
 
-  FDMultiplexer fdmux(42);   // Some wait time until idle is called.
+  FDMultiplexer fdmux(42);  // Some wait time until idle is called.
 
   // Prepare a pipe so that we can send data to the waiting part.
   int read_write_pipe[2];

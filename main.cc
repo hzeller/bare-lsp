@@ -108,7 +108,7 @@ std::vector<TextEdit> HandleFormattingRequest(
       const int needs_spaces = (longest_line - just_text.length()) / 2;
       int existing_spaces = 0;
       for (const char c : lines[i]) {
-        if (c != ' ') break;
+        if (!isspace(c)) break;
         ++existing_spaces;
       }
       if (existing_spaces == needs_spaces) continue;

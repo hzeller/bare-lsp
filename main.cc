@@ -8,19 +8,6 @@
 #include "lsp-text-buffer.h"
 #include "message-stream-splitter.h"
 
-// A signal that should trigger exiting the loop
-static volatile sig_atomic_t caught_exit_trigger_signal = 0;
-
-static void receive_signal(int signo) {
-  static const char msg[] = "Caught signal. Shutting down ASAP.\n";
-  if (!caught_exit_trigger_signal) {  // only print message once.
-    write(STDERR_FILENO, msg, sizeof(msg));
-  }
-  caught_exit_trigger_signal = 1;
-}
-
-static void arm_signal_handler();
-
 void PrintStats(const MessageStreamSplitter &source,
                 const JsonRpcDispatcher &server);
 
@@ -62,7 +49,6 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
   buffer->RequestLine(
       p.position.line, [&word_length, &result, col](absl::string_view line) {
         if (col >= (int)line.length()) return;
-
         // mark range.
         int start = col;
         while (start >= 0 && !isspace(line[start])) {
@@ -104,17 +90,11 @@ std::vector<TextEdit> HandleFormattingRequest(
       longest_line = std::max(longest_line, (int)just_text.length());
     }
     for (int i = start_line; i < end_line; ++i) {
-      absl::string_view just_text = absl::StripAsciiWhitespace(lines[i]);
+      const absl::string_view line = lines[i];
+      const absl::string_view just_text = absl::StripAsciiWhitespace(line);
       const int needs_spaces = (longest_line - just_text.length()) / 2;
-      int existing_spaces = 0;
-      for (const char c : lines[i]) {
-        if (!isspace(c)) break;
-        ++existing_spaces;
-      }
-      if (existing_spaces == needs_spaces) continue;
-
       result.emplace_back(TextEdit{
-          .range = {{i, 0}, {i, existing_spaces}},
+          .range = {{i, 0}, {i, (int)(just_text.begin() - line.begin())}},
           .newText = std::string(needs_spaces, ' '),
       });
     }
@@ -223,10 +203,8 @@ int main(int argc, char *argv[]) {
     auto status = stream_splitter.PullFrom([&](char *buf, int size) -> int {  //
       return read(in_fd, buf, size);
     });
-    if (!status.ok()) {
-      std::cerr << status.message() << "\n";
-    }
-    return status.ok() && !shutdown_requested && !caught_exit_trigger_signal;
+    if (!status.ok()) std::cerr << status.message() << "\n";
+    return status.ok() && !shutdown_requested;
   });
 
   // Run diagnostics in idle time, but make sure to only look at buffers that
@@ -242,12 +220,8 @@ int main(int argc, char *argv[]) {
     return true;
   });
 
-  arm_signal_handler();
   file_multiplexer.Loop();
 
-  if (caught_exit_trigger_signal) {
-    std::cerr << "Exiting due to signal\n";
-  }
   PrintStats(stream_splitter, dispatcher);
   return 0;
 }
@@ -266,20 +240,4 @@ void PrintStats(const MessageStreamSplitter &source,
   for (const auto &stats : server.GetStatCounters()) {
     fprintf(stderr, "%*s %9d\n", longest, stats.first.c_str(), stats.second);
   }
-}
-
-static void arm_signal_handler() {
-  caught_exit_trigger_signal = 0;
-
-  struct sigaction sa = {};
-  sa.sa_handler = receive_signal;
-
-  // We might get multiple signals on shutdown, so not using SA_RESETHAND
-  sa.sa_flags = 0;
-  sigaction(SIGTERM, &sa, NULL);  // Regular kill
-  sigaction(SIGINT, &sa, NULL);   // Ctrl-C
-
-  sigaction(SIGSEGV, &sa, NULL);
-  sigaction(SIGBUS, &sa, NULL);
-  sigaction(SIGFPE, &sa, NULL);
 }

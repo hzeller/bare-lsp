@@ -78,8 +78,8 @@ bool EditTextBuffer::LineEdit(const TextDocumentContentChangeEvent &c,
   document_length_ -= str->length();
   const absl::string_view assembly = *str;
   const auto before = assembly.substr(0, c.range.start.character);
-  const auto behind = assembly.substr(end_char);
-  *str = absl::StrCat(before, c.text, behind);
+  const auto after = assembly.substr(end_char);
+  *str = absl::StrCat(before, c.text, after);
   document_length_ += str->length();
   return true;
 }
@@ -89,11 +89,11 @@ bool EditTextBuffer::MultiLineEdit(const TextDocumentContentChangeEvent &c) {
   const auto before = start_line.substr(0, c.range.start.character);
 
   const absl::string_view end_line = *lines_[c.range.end.line];
-  const auto behind = end_line.substr(c.range.end.character);
+  const auto after = end_line.substr(c.range.end.character);
 
   // Assemble the full content to replace the range of lines with including
   // the parts that come from the first and last line to be edited.
-  const std::string new_content = absl::StrCat(before, c.text, behind);
+  const std::string new_content = absl::StrCat(before, c.text, after);
 
   // Content length update: substract all the bytes that were in the old
   // content and add all in the new content.

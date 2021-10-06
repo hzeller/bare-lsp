@@ -29,12 +29,12 @@ void FDMultiplexer::RunOnIdle(const Handler &handler) {
   idle_handlers_.push_back(handler);
 }
 
-static void CallHandlers(fd_set *to_call_fd_set, int *available_fds,
+static void CallHandlers(fd_set *to_call_fd_set, int available_fds,
                          std::map<int, FDMultiplexer::Handler> *handlers) {
-  for (auto it = handlers->begin(); *available_fds && it != handlers->end();) {
+  for (auto it = handlers->begin(); available_fds && it != handlers->end();) {
     bool keep_handler = true;
     if (FD_ISSET(it->first, to_call_fd_set)) {
-      --*available_fds;
+      --available_fds;
       keep_handler = it->second();
     }
     it = keep_handler ? std::next(it) : handlers->erase(it);
@@ -51,7 +51,6 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
   int maxfd = -1;
   FD_ZERO(&read_fds);
 
-  // Readers
   for (const auto &it : read_handlers_) {
     maxfd = std::max(maxfd, it.first);
     FD_SET(it.first, &read_fds);
@@ -59,7 +58,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
 
   if (maxfd < 0) {
     // file descriptors only can be registred from within handlers
-    // or before running the Loop(). So if no filedesctiptors are left,
+    // or before running the Loop(). So if no descriptors are left,
     // there is no chance for any to re-appear, so we can exit.
     return false;
   }
@@ -78,7 +77,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
     return true;
   }
 
-  CallHandlers(&read_fds, &fds_ready, &read_handlers_);
+  CallHandlers(&read_fds, fds_ready, &read_handlers_);
 
   return true;
 }

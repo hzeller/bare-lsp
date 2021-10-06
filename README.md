@@ -47,6 +47,29 @@ cursor.
 
 #### Vim
 
+TBD. What I found so far, there is
+[vim-lsp](https://github.com/prabirshrestha/vim-lsp) that can be used.
+
+Start out with adding plug if not already.
+```
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+   https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+```
+
+This seems to be the starting point
+```
+cat >> ~/.vim/vimrc <<EOF
+call plug#begin('~/.vim/plugged')
+Plug 'prabirshrestha/vim-lsp'
+Plug 'mattn/vim-lsp-settings'
+call plug#end()
+EOF
+```
+
+.. then somewhere on here https://github.com/mattn/vim-lsp-settings there should
+be an explanation how to add your own server (help needed for this section,
+what needs to be configured for a new server ?)
+
 #### Sublime
 Consult https://lsp.readthedocs.io/
 

@@ -103,20 +103,26 @@ class BufferCollection {
     return found == buffers_.end() ? nullptr : found->second.get();
   }
 
-  // Calls fun() on each buffer
-  void Map(const std::function<void(const std::string &uri,
-                                    const EditTextBuffer &buffer)> &fun) const {
-    for (const auto &b : buffers_) fun(b.first, *b.second);
-  }
-
   // Edits done on all buffers from all time. Allows to compare a single
-  // number if there is any change since last time.
-  int64_t global_version() const { return global_edits_; }
+  // number if there is any change since last time. Good to remember to get
+  // only changed buffers when calling MapBuffersChangedSince()
+  int64_t global_version() const { return global_version_; }
+
+  // Calls "map_fun"() on each buffer that has changed since the given version.
+  // This allows to only proces changed buffers.
+  // Use 0 (zero) as last version to have the map function receive all buffers.
+  // "map_fun" can be nullptr in which case only the number of changed buffers.
+  // are returned.
+  // Returns number of buffers for which the condition applied.
+  int MapBuffersChangedSince(
+      int64_t last_global_version,
+      const std::function<void(const std::string &uri,
+                               const EditTextBuffer &buffer)> &map_fun) const;
 
   size_t documents_open() const { return buffers_.size(); }
 
  private:
-  int64_t global_edits_ = 0;
+  int64_t global_version_ = 0;
   std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
 };
 

@@ -257,11 +257,11 @@ int main(int argc, char *argv[]) {
   // have changed since our last visit.
   int64_t last_version_processed = 0;
   file_multiplexer.RunOnIdle([&]() {
-    if (buffers.global_version() == last_version_processed) return true;
-    buffers.Map([&](const std::string &uri, const EditTextBuffer &buffer) {
-      if (buffer.last_global_version() <= last_version_processed) return;
-      RunDiagnostics(uri, buffer, &dispatcher);
-    });
+    buffers.MapBuffersChangedSince(
+        last_version_processed,
+        [&](const std::string &uri, const EditTextBuffer &buffer) {
+          RunDiagnostics(uri, buffer, &dispatcher);
+        });
     last_version_processed = buffers.global_version();
     return true;
   });

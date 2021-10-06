@@ -30,8 +30,27 @@ InitializeResult InitializeServer(const nlohmann::json params) {
       {"hoverProvider", true},  // We provide textDocument/hover
       {"documentFormattingProvider", true},
       {"documentRangeFormattingProvider", true},
+      {"documentHighlightProvider", true},
   };
   return result;
+}
+
+// Looks at the surroundings of word for surroundings of non-space.
+static absl::string_view ExtractWordAtPos(absl::string_view line, int pos) {
+  if (pos >= (int)line.length()) return {line.data() + line.size() - 1, 0};
+
+  // TODO: this probably would be nicer with some std::-algorithms.
+  int start = pos;
+  while (start >= 0 && !isspace(line[start])) {
+    --start;
+  }
+  ++start;
+
+  int end = pos;
+  while (end < (int)line.length() && !isspace(line[end])) {
+    ++end;
+  }
+  return line.substr(start, end - start);
 }
 
 // Example of a simple hover request: we just report how long the word
@@ -48,21 +67,10 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
   result.range.start.character = result.range.end.character = col;
   buffer->RequestLine(
       p.position.line, [&word_length, &result, col](absl::string_view line) {
-        if (col >= (int)line.length()) return;
-        // mark range.
-        int start = col;
-        while (start >= 0 && !isspace(line[start])) {
-          --start;
-        }
-        ++start;
-        result.range.start.character = start;
-
-        int end = col;
-        while (end < (int)line.length() && !isspace(line[end])) {
-          ++end;
-        }
-        result.range.end.character = end;
-        word_length = end - start;
+        auto w = ExtractWordAtPos(line, col);
+        result.range.start.character = w.data() - line.data();
+        result.range.end.character = result.range.start.character + w.length();
+        word_length = w.length();
       });
   if (word_length < 0) return nullptr;
 
@@ -70,6 +78,40 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
       "A word with **" + std::to_string(word_length) + "** letters";
   result.has_range = true;
 
+  return result;
+}
+
+nlohmann::json HandleHighlightRequest(const BufferCollection &buffers,
+                                      const DocumentHighlightParams &p) {
+  const EditTextBuffer *buffer = buffers.findBufferByUri(p.textDocument.uri);
+  if (!buffer) return nullptr;
+
+  std::vector<DocumentHighlight> result;
+  buffer->RequestContent([&](absl::string_view content) {
+    const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
+    // First, let's extract the word we're currently on.
+    if (p.position.line >= (int)lines.size()) return;
+    auto word = ExtractWordAtPos(lines[p.position.line], p.position.character);
+    if (word.empty()) return;
+    for (int row = 0; row < (int)lines.size(); ++row) {
+      const auto &line = lines[row];
+      size_t col = 0;
+      while ((col = line.find(word, col)) != absl::string_view::npos) {
+        const size_t eow = col + word.length();
+        // Only if we're surrounded by space, this is a full word.
+        const bool is_word = ((col == 0 || isspace(line[col - 1])) &&
+                              (eow == line.length() || isspace(line[eow])));
+        if (is_word) {
+          result.emplace_back(DocumentHighlight{
+              .range = {{row, (int)col}, {row, (int)(col + word.length())}},
+          });
+          col = eow;
+        } else {
+          col += 1;
+        }
+      }
+    }
+  });
   return result;
 }
 
@@ -183,6 +225,10 @@ int main(int argc, char *argv[]) {
   dispatcher.AddRequestHandler("textDocument/rangeFormatting",
                                [&buffers](const DocumentFormattingParams &p) {
                                  return HandleFormattingRequest(buffers, p);
+                               });
+  dispatcher.AddRequestHandler("textDocument/documentHighlight",
+                               [&buffers](const DocumentHighlightParams &p) {
+                                 return HandleHighlightRequest(buffers, p);
                                });
 
   /* For the actual processing, we want to do extra diagnostics in idle time

@@ -78,6 +78,14 @@ Hover:
   contents: MarkupContent
   range?: Range
 
+# -- textDocument/documentHighlight
+DocumentHighlightParams:
+  <: TextDocumentPositionParams
+
+DocumentHighlight:         # response documentHighlight is [] of this.
+  range: Range
+  # there is also a highlight kind to distinguish read/write
+
 # -- textDocument/formatting
 FormattingOptions:
   # Not using any of the options right now.

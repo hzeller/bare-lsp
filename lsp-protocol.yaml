@@ -77,6 +77,19 @@ Hover:
   contents: MarkupContent
   range?: Range
 
+# -- textDocument/formatting
+FormattingOptions:
+  # Not using any of the options right now.
+
+DocumentFormattingParams:
+  textDocument: TextDocumentIdentifier
+  range?: Range               # only used for textDocument/rangeFormatting
+  options: FormattingOptions
+
+TextEdit:
+  range: Range
+  newText: string
+
 # -- Code action
 CodeActionParams:              # textDocument/codeAction
   #<:WorkDoneProgressParams,

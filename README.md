@@ -130,6 +130,9 @@ So far implemented
   * Demo implementation of RPC handlers
      - Initialization (`initialize`, `initialized`)
      - Sample hover command (`textDocument/hover`)
+       (showing character count in word)
+     - Sample formatting command (`textDocument/formatting` and
+       `textDocument/rangeFormatting`) (centering text)
   * Prepared calling of linting etc. in idle time.
 
 Pro-tip: Useful for testing and replaying sessions is the [bidi-tee] tool.

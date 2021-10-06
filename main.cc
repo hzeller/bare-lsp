@@ -1,6 +1,6 @@
 #include <ctype.h>
-#include <unistd.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "fd-mux.h"
 #include "json-rpc-dispatcher.h"
@@ -41,6 +41,8 @@ InitializeResult InitializeServer(const nlohmann::json params) {
           },
       },
       {"hoverProvider", true},  // We provide textDocument/hover
+      {"documentFormattingProvider", true},
+      {"documentRangeFormattingProvider", true},
   };
   return result;
 }
@@ -82,6 +84,41 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
       "A word with **" + std::to_string(word_length) + "** letters";
   result.has_range = true;
 
+  return result;
+}
+
+// Formatting example: center text.
+std::vector<TextEdit> HandleFormattingRequest(
+    const BufferCollection &buffers, const DocumentFormattingParams &p) {
+  const EditTextBuffer *buffer = buffers.findBufferByUri(p.textDocument.uri);
+  if (!buffer) return {};
+
+  std::vector<TextEdit> result;
+  buffer->RequestContent([&p, &result](absl::string_view content) {
+    const std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
+    const int start_line = p.has_range ? p.range.start.line : 0;
+    const int end_line = p.has_range ? p.range.end.line : (int)lines.size();
+    int longest_line = 0;
+    for (int i = start_line; i < end_line; ++i) {
+      absl::string_view just_text = absl::StripAsciiWhitespace(lines[i]);
+      longest_line = std::max(longest_line, (int)just_text.length());
+    }
+    for (int i = start_line; i < end_line; ++i) {
+      absl::string_view just_text = absl::StripAsciiWhitespace(lines[i]);
+      const int needs_spaces = (longest_line - just_text.length()) / 2;
+      int existing_spaces = 0;
+      for (const char c : lines[i]) {
+        if (c != ' ') break;
+        ++existing_spaces;
+      }
+      if (existing_spaces == needs_spaces) continue;
+
+      result.emplace_back(TextEdit{
+          .range = {{i, 0}, {i, existing_spaces}},
+          .newText = std::string(needs_spaces, ' '),
+      });
+    }
+  });
   return result;
 }
 
@@ -132,6 +169,14 @@ int main(int argc, char *argv[]) {
   dispatcher.AddRequestHandler("textDocument/hover",
                                [&buffers](const HoverParams &p) {
                                  return HandleHoverRequest(buffers, p);
+                               });
+  dispatcher.AddRequestHandler("textDocument/formatting",
+                               [&buffers](const DocumentFormattingParams &p) {
+                                 return HandleFormattingRequest(buffers, p);
+                               });
+  dispatcher.AddRequestHandler("textDocument/rangeFormatting",
+                               [&buffers](const DocumentFormattingParams &p) {
+                                 return HandleFormattingRequest(buffers, p);
                                });
 
   /* For the actual processing, we want to do extra diagnostics in idle time

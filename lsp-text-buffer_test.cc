@@ -15,8 +15,9 @@
 #include "lsp-text-buffer.h"
 
 #include <absl/strings/str_cat.h>
-#include "json-rpc-dispatcher.h"
+
 #include "gtest/gtest.h"
+#include "json-rpc-dispatcher.h"
 
 TEST(TextBufferTest, RecreateEmptyFile) {
   EditTextBuffer buffer("");

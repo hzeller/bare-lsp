@@ -90,6 +90,12 @@ TextEdit:
   range: Range
   newText: string
 
+# -- publish Diagnostics
+# this is a notification that we send server -> client
+PublishDiagnosticsParams:
+  uri: string
+  diagnostics+: Diagnostic
+
 # -- Code action
 CodeActionParams:              # textDocument/codeAction
   #<:WorkDoneProgressParams,

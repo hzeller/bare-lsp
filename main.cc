@@ -122,6 +122,32 @@ std::vector<TextEdit> HandleFormattingRequest(
   return result;
 }
 
+void RunDiagnostics(const std::string &uri, const EditTextBuffer &buffer,
+                    JsonRpcDispatcher *dispatcher) {
+  // We complain about all words that are ... "wrong" :)
+  static constexpr absl::string_view kComplainWord = "wrong";
+  PublishDiagnosticsParams params;
+  params.uri = uri;
+  buffer.RequestContent([&](absl::string_view content) {
+    int pos_line = 0;
+    for (absl::string_view line : absl::StrSplit(content, '\n')) {
+      size_t col = 0;
+      while ((col = line.find(kComplainWord, col)) != absl::string_view::npos) {
+        params.diagnostics.emplace_back(Diagnostic{
+            .range = {{pos_line, (int)col},
+                      {pos_line, (int)(col + kComplainWord.length())}},
+            .message = "That word is wrong :)",
+        });
+        col += kComplainWord.length();
+      }
+      pos_line++;
+    }
+  });
+  if (!params.diagnostics.empty()) {
+    dispatcher->SendNotification("textDocument/publishDiagnostics", params);
+  }
+}
+
 int main(int argc, char *argv[]) {
   std::cerr << "Greetings! bare-lsp started.\n";
 
@@ -188,7 +214,7 @@ int main(int argc, char *argv[]) {
    * on idle is achieving this task and will also allow us to work
    * single-threaded easily.
    */
-  static constexpr int kIdleTimeoutMs = 100;
+  static constexpr int kIdleTimeoutMs = 300;
   FDMultiplexer file_multiplexer(kIdleTimeoutMs);
 
   // Whenever there is something to read from stdin, feed our message
@@ -203,10 +229,17 @@ int main(int argc, char *argv[]) {
     return status.ok() && !shutdown_requested && !caught_exit_trigger_signal;
   });
 
-  file_multiplexer.RunOnIdle([]() {
-    // No editing going on in a while, so TODO let's go through all the buffers
-    // and do some linting and send some diagnosis.
-    // std::cerr << "Idle call\n";  // TODO: actually do something :)
+  // Run diagnostics in idle time, but make sure to only look at buffers that
+  // have changed since our last visit.
+  int64_t last_version_processed = 0;
+  file_multiplexer.RunOnIdle([&]() {
+    if (buffers.global_version() == last_version_processed)
+      return true;
+    buffers.Map([&](const std::string &uri, const EditTextBuffer &buffer) {
+      if (buffer.last_global_version() <= last_version_processed) return;
+      RunDiagnostics(uri, buffer, &dispatcher);
+    });
+    last_version_processed = buffers.global_version();
     return true;
   });
 

@@ -133,6 +133,7 @@ So far implemented
        (showing character count in word)
      - Sample formatting command (`textDocument/formatting` and
        `textDocument/rangeFormatting`) (centering text)
+     - Sample 'diagnostics' that mark all sequences `wrong` to be wrong :)
   * Prepared calling of linting etc. in idle time.
 
 Pro-tip: Useful for testing and replaying sessions is the [bidi-tee] tool.

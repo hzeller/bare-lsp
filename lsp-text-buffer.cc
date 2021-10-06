@@ -25,7 +25,6 @@ void EditTextBuffer::ApplyChanges(
 
 // Apply a LSP edit operatation.
 bool EditTextBuffer::ApplyChange(const TextDocumentContentChangeEvent &c) {
-  ++edit_count_;
   if (!c.has_range) {
     ReplaceDocument(c.text);
     return true;
@@ -135,6 +134,7 @@ void BufferCollection::didOpenEvent(const DidOpenTextDocumentParams &o) {
   auto inserted = buffers_.insert({o.textDocument.uri, nullptr});
   if (inserted.second) {
     inserted.first->second.reset(new EditTextBuffer(o.textDocument.text));
+    inserted.first->second->set_last_global_version(++global_edits_);
   }
 }
 
@@ -145,7 +145,9 @@ void BufferCollection::didCloseEvent(const DidCloseTextDocumentParams &o) {
 void BufferCollection::didChangeEvent(const DidChangeTextDocumentParams &o) {
   auto found = buffers_.find(o.textDocument.uri);
   if (found == buffers_.end()) return;
-  found->second->ApplyChanges(o.contentChanges);
+  EditTextBuffer *buffer = found->second.get();
+  buffer->ApplyChanges(o.contentChanges);
+  buffer->set_last_global_version(++global_edits_);
 }
 
 void EditTextBuffer::RequestContent(const ContentProcessFun &processor) const {

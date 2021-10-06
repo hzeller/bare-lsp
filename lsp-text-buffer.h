@@ -59,9 +59,11 @@ class EditTextBuffer {
   // Length of document in bytes.
   int64_t document_length() const { return document_length_; }
 
-  // Number of edits applied to this document since the start. Can be used
-  // as an ever increasing 'version number' of sorts.
-  int64_t edit_count() const { return edit_count_; }
+  // Last global version number this buffer has edited from.
+  int64_t last_global_version() const { return last_global_version_; }
+
+  // Set global version; this typically will be done by the BufferCollection.
+  void set_last_global_version(int64_t v) { last_global_version_ = v; }
 
  private:
   // TODO: this should be unique_ptr, but assignment in the insert() command
@@ -73,7 +75,7 @@ class EditTextBuffer {
   bool LineEdit(const TextDocumentContentChangeEvent &c, std::string *str);
   bool MultiLineEdit(const TextDocumentContentChangeEvent &c);
 
-  int64_t edit_count_ = 0;
+  int64_t last_global_version_ = 0;
   int64_t document_length_ = 0;
   LineVector lines_;
 };
@@ -101,9 +103,20 @@ class BufferCollection {
     return found == buffers_.end() ? nullptr : found->second.get();
   }
 
+  // Calls fun() on each buffer
+  void Map(const std::function<void(const std::string &uri,
+                                    const EditTextBuffer &buffer)> &fun) const {
+    for (const auto &b : buffers_) fun(b.first, *b.second);
+  }
+
+  // Edits done on all buffers from all time. Allows to compare a single
+  // number if there is any change since last time.
+  int64_t global_version() const { return global_edits_; }
+
   size_t documents_open() const { return buffers_.size(); }
 
  private:
+  int64_t global_edits_ = 0;
   std::unordered_map<std::string, std::unique_ptr<EditTextBuffer>> buffers_;
 };
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "fd-mux.h"
+#include "file-event-dispatcher.h"
 
 #include <sys/select.h>
 
@@ -21,16 +21,17 @@
 #include <cstdio>
 #include <cstring>
 
-bool FDMultiplexer::RunOnReadable(int fd, const Handler &handler) {
+bool FileEventDispatcher::RunOnReadable(int fd, const Handler &handler) {
   return read_handlers_.insert({fd, handler}).second;
 }
 
-void FDMultiplexer::RunOnIdle(const Handler &handler) {
+void FileEventDispatcher::RunOnIdle(const Handler &handler) {
   idle_handlers_.push_back(handler);
 }
 
-static void CallHandlers(fd_set *to_call_fd_set, int available_fds,
-                         std::map<int, FDMultiplexer::Handler> *handlers) {
+static void CallHandlers(
+    fd_set *to_call_fd_set, int available_fds,
+    std::map<int, FileEventDispatcher::Handler> *handlers) {
   for (auto it = handlers->begin(); available_fds && it != handlers->end();) {
     bool keep_handler = true;
     if (FD_ISSET(it->first, to_call_fd_set)) {
@@ -41,7 +42,7 @@ static void CallHandlers(fd_set *to_call_fd_set, int available_fds,
   }
 }
 
-bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
+bool FileEventDispatcher::SingleCycle(unsigned int timeout_ms) {
   fd_set read_fds;
 
   struct timeval timeout;
@@ -82,7 +83,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
   return true;
 }
 
-void FDMultiplexer::Loop() {
+void FileEventDispatcher::Loop() {
   const unsigned timeout = idle_ms_;
 
   while (SingleCycle(timeout)) {

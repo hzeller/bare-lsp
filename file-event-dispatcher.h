@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef FD_MUX_H_
-#define FD_MUX_H_
+#ifndef FILE_EVENT_DISPATCHER_H_
+#define FILE_EVENT_DISPATCHER_H_
 
 #include <functional>
 #include <list>
 #include <map>
 
-class FDMultiplexer {
+class FileEventDispatcher {
  public:
-  FDMultiplexer(unsigned idle_ms = 50) : idle_ms_(idle_ms) {}
+  FileEventDispatcher(unsigned idle_ms = 50) : idle_ms_(idle_ms) {}
 
   // Handlers for events from this multiplexer.
   // Returns true if we want to continue to be called in the future or false

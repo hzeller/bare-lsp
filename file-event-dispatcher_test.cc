@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "fd-mux.h"
+#include "file-event-dispatcher.h"
 
 #include <unistd.h>
 
@@ -32,7 +32,7 @@ TEST(FdMuxTest, IdleAndReadableCallHandled) {
   // wakes up the reader.
   static constexpr absl::string_view kMessage = "Hello";
 
-  FDMultiplexer fdmux(42);  // Some wait time until idle is called.
+  FileEventDispatcher fdmux(42);  // Some wait time until idle is called.
 
   // Prepare a pipe so that we can send data to the waiting part.
   int read_write_pipe[2];

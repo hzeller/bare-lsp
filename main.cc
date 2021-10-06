@@ -2,7 +2,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "fd-mux.h"
+#include "file-event-dispatcher.h"
 #include "json-rpc-dispatcher.h"
 #include "lsp-protocol.h"
 #include "lsp-text-buffer.h"
@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
    * single-threaded easily.
    */
   static constexpr int kIdleTimeoutMs = 300;
-  FDMultiplexer file_multiplexer(kIdleTimeoutMs);
+  FileEventDispatcher file_multiplexer(kIdleTimeoutMs);
 
   // Whenever there is something to read from stdin, feed our message
   // to the stream splitter which will in turn call the JSON rpc dispatcher

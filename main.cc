@@ -168,6 +168,9 @@ int main(int argc, char *argv[]) {
   arm_signal_handler();
   file_multiplexer.Loop();
 
+  if (caught_exit_trigger_signal) {
+    std::cerr << "Exiting due to signal\n";
+  }
   PrintStats(stream_splitter, dispatcher);
   return 0;
 }

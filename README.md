@@ -27,6 +27,7 @@ This will be specific to your editor. The main thing is that you need to tell
 it to start your language server binary (here: `lsp-server`) in a particular
 language environment.
 
+#### Emacs
 Here a simple example how to hook up emacs; put this in your `~/.emacs` file
 and make sure the binary is in your `$PATH` (or use full path).
 
@@ -40,6 +41,43 @@ and make sure the binary is in your `$PATH` (or use full path).
 
 (add-hook 'text-mode-hook 'lsp)
 ```
+
+The hovering feature will be shown in the minibuffer with each move of the
+cursor.
+
+#### Vim
+
+#### Sublime
+Consult https://lsp.readthedocs.io/
+
+After enabling the package control you can install 'LSP' with it.
+Go to `Preferences > Package Settings > LSP > Settings`
+
+Configure settings so that your language server is started in the scope
+of language you need.
+
+```json
+// Settings in here override those in "LSP/LSP.sublime-settings"
+{
+  "clients": {
+    "bare-lsp": {
+      "command": ["my-lsp-server"],
+      "enabled": true,
+      "languageId": "text",
+      "scopes": ["text.plain"],
+      "syntaxes": [ "Packages/Text/Plain text.tmLanguage"]
+    }
+  }
+}
+```
+
+The hovering feature in this demo bare-lsp shows up when double-clicking a
+word, then hover over the text.
+
+There is a `Tools > LSP > Troubleshoot Server Configuration` which might
+be helpful.
+
+#### Debugging
 
 For debugging the protocol, it is useful to log what is going on between your
 editor and the lsp server. The [bidi-tee] is a useful debugging tool - it does

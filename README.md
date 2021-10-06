@@ -100,6 +100,29 @@ word, then hover over the text.
 There is a `Tools > LSP > Troubleshoot Server Configuration` which might
 be helpful.
 
+### Kate
+
+https://docs.kde.org/trunk5/en/kate/kate/kate-application-plugin-lspclient.html
+
+For our example, it seems that kate does not consider 'text' a separate
+language, so let's configure that in markdown.
+
+First, enable LSP by checking `Settings > Configure Kate > Plugins > LSP Client`
+Then, there is a new `{} LSP Client` icon appearing on the left of the configure dialog. In the _User Server Settings_ tab, enter the lsp server configuration
+to get it started on a particular language. Here: for `markdown`
+
+```json
+{
+    "servers": {
+        "markdown": {
+            "command": ["my-lsp-server"],
+            "root": "",
+            "url": "https://github.com/hzeller/bare-lsp"
+        }
+    }
+}
+```
+
 ## Debugging
 
 For debugging the protocol, it is useful to log what is going on between your

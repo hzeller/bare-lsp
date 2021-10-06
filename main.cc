@@ -1,11 +1,25 @@
 #include <ctype.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "fd-mux.h"
 #include "json-rpc-dispatcher.h"
 #include "lsp-protocol.h"
 #include "lsp-text-buffer.h"
 #include "message-stream-splitter.h"
+
+// A signal that should trigger exiting the loop
+static volatile sig_atomic_t caught_exit_trigger_signal = 0;
+
+static void receive_signal(int signo) {
+  static const char msg[] = "Caught signal. Shutting down ASAP.\n";
+  if (!caught_exit_trigger_signal) {  // only print message once.
+    write(STDERR_FILENO, msg, sizeof(msg));
+  }
+  caught_exit_trigger_signal = 1;
+}
+
+static void arm_signal_handler();
 
 void PrintStats(const MessageStreamSplitter &source,
                 const JsonRpcDispatcher &server);
@@ -72,6 +86,8 @@ nlohmann::json HandleHoverRequest(const BufferCollection &buffers,
 }
 
 int main(int argc, char *argv[]) {
+  std::cerr << "Greetings! bare-lsp started.\n";
+
   // Input and output is stdin and stdout
   static constexpr int in_fd = STDIN_FILENO;
   JsonRpcDispatcher::WriteFun write_fun = [](absl::string_view reply) {
@@ -136,7 +152,10 @@ int main(int argc, char *argv[]) {
     auto status = stream_splitter.PullFrom([&](char *buf, int size) -> int {  //
       return read(in_fd, buf, size);
     });
-    return status.ok() && !shutdown_requested;
+    if (!status.ok()) {
+      std::cerr << status.message() << "\n";
+    }
+    return status.ok() && !shutdown_requested && !caught_exit_trigger_signal;
   });
 
   file_multiplexer.RunOnIdle([]() {
@@ -146,6 +165,7 @@ int main(int argc, char *argv[]) {
     return true;
   });
 
+  arm_signal_handler();
   file_multiplexer.Loop();
 
   PrintStats(stream_splitter, dispatcher);
@@ -166,4 +186,20 @@ void PrintStats(const MessageStreamSplitter &source,
   for (const auto &stats : server.GetStatCounters()) {
     fprintf(stderr, "%*s %9d\n", longest, stats.first.c_str(), stats.second);
   }
+}
+
+static void arm_signal_handler() {
+  caught_exit_trigger_signal = 0;
+
+  struct sigaction sa = {};
+  sa.sa_handler = receive_signal;
+
+  // We might get multiple signals on shutdown, so not using SA_RESETHAND
+  sa.sa_flags = 0;
+  sigaction(SIGTERM, &sa, NULL);  // Regular kill
+  sigaction(SIGINT, &sa, NULL);   // Ctrl-C
+
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
+  sigaction(SIGFPE, &sa, NULL);
 }

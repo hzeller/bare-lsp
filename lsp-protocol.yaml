@@ -20,6 +20,7 @@ LocationLink:
 
 Diagnostic:
   range: Range
+  source: string = "bare-lsp"
   message: string
 
 TextDocumentIdentifier:

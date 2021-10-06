@@ -21,13 +21,13 @@ whatever is commonly used in the project to be integrated in.
 
 The code generation for structs convertible to json is done using [jcxxgen].
 
-### Hooking up to editor
+## Hooking up to editor
 
 This will be specific to your editor. The main thing is that you need to tell
 it to start your language server binary (here: `lsp-server`) in a particular
 language environment.
 
-#### Emacs
+### Emacs
 Here a simple example how to hook up emacs; put this in your `~/.emacs` file
 and make sure the binary is in your `$PATH` (or use full path).
 
@@ -45,7 +45,7 @@ and make sure the binary is in your `$PATH` (or use full path).
 The hovering feature will be shown in the minibuffer with each move of the
 cursor.
 
-#### Vim
+### Vim
 
 TBD. What I found so far, there is
 [vim-lsp](https://github.com/prabirshrestha/vim-lsp) that can be used.
@@ -70,7 +70,7 @@ EOF
 be an explanation how to add your own server (help needed for this section,
 what needs to be configured for a new server ?)
 
-#### Sublime
+### Sublime
 Consult https://lsp.readthedocs.io/
 
 After enabling the package control you can install 'LSP' with it.
@@ -100,7 +100,7 @@ word, then hover over the text.
 There is a `Tools > LSP > Troubleshoot Server Configuration` which might
 be helpful.
 
-#### Debugging
+## Debugging
 
 For debugging the protocol, it is useful to log what is going on between your
 editor and the lsp server. The [bidi-tee] is a useful debugging tool - it does

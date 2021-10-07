@@ -191,6 +191,40 @@ void RunDiagnostics(const std::string &uri, const EditTextBuffer &buffer,
   dispatcher->SendNotification("textDocument/publishDiagnostics", params);
 }
 
+bool operator<(const Position &a, const Position &b) {
+  if (a.line > b.line) return false;
+  if (a.line < b.line) return true;
+  return a.character < b.character;
+}
+bool rangeOverlap(const Range &a, const Range &b) {
+  return (a.start < b.end && b.start < a.end);
+}
+std::vector<CodeAction> HandleCodeAction(const BufferCollection &buffers,
+                                         const CodeActionParams &p) {
+  const EditTextBuffer *buffer = buffers.findBufferByUri(p.textDocument.uri);
+  if (!buffer) return {};
+  const auto &lint_result = RunLint(*buffer);
+  if (lint_result.empty()) return {};
+  std::vector<CodeAction> result;
+  for (const auto &fix_pair : lint_result) {
+    if (!rangeOverlap(fix_pair.diagnostic.range, p.range))
+      continue;
+    bool preferred_fix = true;
+    for (const auto &fix : fix_pair.fixes) {
+      result.emplace_back(CodeAction{
+          .title = fix.title,
+          .kind = "quickfix",
+          .diagnostics = {fix_pair.diagnostic},
+          .isPreferred = preferred_fix,
+          // The following is translated from json, map uri -> edits.
+          .edit = {.changes = {{p.textDocument.uri, fix.edit }}},
+      });
+      preferred_fix = false;  // only the first is preferred.
+    }
+  }
+  return result;
+}
+
 int main(int argc, char *argv[]) {
   std::cerr << "Greetings! bare-lsp started.\n";
 
@@ -250,6 +284,10 @@ int main(int argc, char *argv[]) {
   dispatcher.AddRequestHandler("textDocument/documentHighlight",
                                [&buffers](const DocumentHighlightParams &p) {
                                  return HandleHighlightRequest(buffers, p);
+                               });
+  dispatcher.AddRequestHandler("textDocument/codeAction",
+                               [&buffers](const CodeActionParams &p) {
+                                 return HandleCodeAction(buffers, p);
                                });
 
   /* For the actual processing, we want to do extra diagnostics in idle time

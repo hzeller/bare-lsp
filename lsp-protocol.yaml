@@ -120,10 +120,10 @@ WorkspaceEdit:
 # textDocument/codeAction will return an array of these (or array of Command)
 CodeAction:
   title: string
-  kind?: string                 # Kind of change e.g quickfix, refactor, ...
-  diagnostics+?: Diagnostic     # What diagnostic is this referring to ?
+  kind: string                 # Kind of change e.g quickfix, refactor, ...
+  diagnostics+: Diagnostic     # What diagnostic is this referring to ?
   isPreferred: boolean = false
-  edit?: WorkspaceEdit
+  edit: WorkspaceEdit
 
 # -- textDocument/publishDiagnostics
 # This is a notification that is sent from the server to the client

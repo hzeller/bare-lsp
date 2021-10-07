@@ -14,6 +14,8 @@
 
 #include "json-rpc-dispatcher.h"
 
+#include <iomanip>
+
 void JsonRpcDispatcher::DispatchMessage(absl::string_view data) {
   nlohmann::json request;
   try {
@@ -116,6 +118,6 @@ void JsonRpcDispatcher::SendNotification(const std::string &method,
 
 void JsonRpcDispatcher::SendReply(const nlohmann::json &response) {
   std::stringstream out_bytes;
-  out_bytes << response << "\n";
+  out_bytes << std::setw(2) << response << "\n";
   write_fun_(out_bytes.str());
 }

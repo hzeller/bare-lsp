@@ -87,13 +87,9 @@ DocumentHighlight:         # response documentHighlight is [] of this.
   # there is also a highlight kind to distinguish read/write
 
 # -- textDocument/formatting
-FormattingOptions:
-  # Not using any of the options right now.
-
 DocumentFormattingParams:
   textDocument: TextDocumentIdentifier
   range?: Range               # only used for textDocument/rangeFormatting
-  options: FormattingOptions
 
 TextEdit:
   range: Range
@@ -101,8 +97,6 @@ TextEdit:
 
 # -- Code action
 CodeActionParams:              # textDocument/codeAction
-  #<:WorkDoneProgressParams,
-  #<:PartialResultParams
   textDocument: TextDocumentIdentifier
   range: Range
   #context: CodeActionContext
@@ -135,3 +129,16 @@ TitledFix:
 DiagnosticFixPair:
   diagnostic: Diagnostic
   fixes+: TitledFix     # A choice of fixes for this problem
+
+# -- textDocument/documentSymbol
+DocumentSymbolParams:
+  textDocument: TextDocumentIdentifier
+
+DocumentSymbol:
+  name: string
+  kind: integer   # SymbolKind enum
+  #tags?: SymbolTag
+  #deprecated?: boolean
+  range: Range    # The whole range this symbol (e.g. function/class) covers
+  selectionRange: Range  # Part to be highlighted (e.g. name of class)
+  children?: object   # DocumentSymbol[]; JSON as can't nest std::vector with it.

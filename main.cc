@@ -31,6 +31,7 @@ InitializeResult InitializeServer(const nlohmann::json params) {
       {"documentFormattingProvider", true},
       {"documentRangeFormattingProvider", true},
       {"documentHighlightProvider", true},
+      {"documentSymbolProvider", true},
       {"codeActionProvider", true},
   };
   return result;
@@ -223,6 +224,63 @@ std::vector<CodeAction> HandleCodeAction(const BufferCollection &buffers,
   return result;
 }
 
+enum class SymbolKind {
+  File = 1,
+  // ...
+  Namespace = 3,
+  // ...
+  Variable = 13,
+  // ...
+};
+
+std::vector<DocumentSymbol> HandleDocumentSymbol(
+    const BufferCollection &buffers, const DocumentSymbolParams &p) {
+  const EditTextBuffer *buffer = buffers.findBufferByUri(p.textDocument.uri);
+  if (!buffer) return {};
+  std::vector<DocumentSymbol> result;
+  buffer->RequestContent([&p, &result, buffer](absl::string_view content) {
+    int line_no = 0;
+    result.emplace_back(
+      DocumentSymbol{.name = "All the things",
+        .kind = static_cast<int>(SymbolKind::File),
+        .range = {{0, 0}, {(int)buffer->lines(), 0}},
+        .selectionRange = {{0, 0}, {(int)buffer->lines(), 0}},
+        .children = nlohmann::json::array(),
+        .has_children = true
+      });
+    nlohmann::json &append_to = result.back().children;
+    for (absl::string_view line : absl::StrSplit(content, '\n')) {
+      for (absl::string_view word : absl::StrSplit(line, ' ')) {
+        const int col = word.data() - line.data();
+        const int eow = col + word.length();
+        if (word == "world") {
+          append_to.push_back(
+              DocumentSymbol{.name = "World",
+                .kind = static_cast<int>(SymbolKind::Namespace),
+                .range = {{line_no, col}, {line_no, eow}},
+                .selectionRange = {{line_no, col}, {line_no, eow}},
+                .children = nullptr,
+                .has_children = false,
+              });
+        } else if (word == "variable") {
+          append_to.push_back(
+              DocumentSymbol{
+                .name = "Some Variable",
+                .kind = static_cast<int>(SymbolKind::Variable),
+                .range = {{line_no, col}, {line_no, eow}},
+                .selectionRange = {{line_no, col}, {line_no, eow}},
+                .children = nullptr,
+                .has_children = false,
+              });
+        }
+
+      }
+      ++line_no;
+    }
+  });
+  return result;
+}
+
 int main(int argc, char *argv[]) {
   std::cerr << "Greetings! bare-lsp started.\n";
 
@@ -249,8 +307,9 @@ int main(int argc, char *argv[]) {
 
   // Exchange of capabilities.
   dispatcher.AddRequestHandler("initialize", InitializeServer);
-  dispatcher.AddNotificationHandler("initialized", [](const nlohmann::json &) {
-    std::cerr << "From client confirmed: Initialized!\n";
+  bool client_initialized = false;
+  dispatcher.AddNotificationHandler("initialized", [&client_initialized](const nlohmann::json &) {
+    client_initialized = true;
   });
 
   // The server will tell use to shut down but also notifies us on exit. Use
@@ -287,6 +346,10 @@ int main(int argc, char *argv[]) {
                                [&buffers](const CodeActionParams &p) {
                                  return HandleCodeAction(buffers, p);
                                });
+  dispatcher.AddRequestHandler("textDocument/documentSymbol",
+                               [&buffers](const DocumentSymbolParams &p) {
+                                 return HandleDocumentSymbol(buffers, p);
+                               });
 
   /* For the actual processing, we want to do extra diagnostics in idle time
    * whenever we don't get updates for a while (i.e. user stopped typing)
@@ -314,6 +377,7 @@ int main(int argc, char *argv[]) {
   // have changed since our last visit.
   int64_t last_version_processed = 0;
   file_multiplexer.RunOnIdle([&]() {
+    if (!client_initialized) return true;
     buffers.MapBuffersChangedSince(
         last_version_processed,
         [&](const std::string &uri, const EditTextBuffer &buffer) {

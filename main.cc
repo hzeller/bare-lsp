@@ -31,6 +31,7 @@ InitializeResult InitializeServer(const nlohmann::json params) {
       {"documentFormattingProvider", true},
       {"documentRangeFormattingProvider", true},
       {"documentHighlightProvider", true},
+      {"codeActionProvider", true},
   };
   return result;
 }
@@ -144,30 +145,50 @@ std::vector<TextEdit> HandleFormattingRequest(
   return result;
 }
 
-void RunDiagnostics(const std::string &uri, const EditTextBuffer &buffer,
-                    JsonRpcDispatcher *dispatcher) {
+std::vector<DiagnosticFixPair> RunLint(const EditTextBuffer &buffer) {
   // We complain about all words that are ... "wrong" :)
   static constexpr absl::string_view kComplainWord = "wrong";
-  PublishDiagnosticsParams params;
-  params.uri = uri;
+  std::vector<DiagnosticFixPair> result;
   buffer.RequestContent([&](absl::string_view content) {
     int pos_line = 0;
     for (absl::string_view line : absl::StrSplit(content, '\n')) {
       size_t col = 0;
       while ((col = line.find(kComplainWord, col)) != absl::string_view::npos) {
-        params.diagnostics.emplace_back(Diagnostic{
-            .range = {{pos_line, (int)col},
-                      {pos_line, (int)(col + kComplainWord.length())}},
-            .message = "That word is wrong :)",
-        });
+        Range r =  {{pos_line, (int)col},
+                    {pos_line, (int)(col + kComplainWord.length())}};
+        result.emplace_back(DiagnosticFixPair{
+            .diagnostic = {
+              .range = r,
+              .message = "That word is wrong :)",
+            },
+            .fixes = {},
+          });
+        result.back().fixes.emplace_back(TitledFix{
+            .title = "Better Word",
+            .edit = { { .range = r, .newText = "correct" } }
+          });
+        result.back().fixes.emplace_back(TitledFix{
+            .title = "Ambiguous but same length",
+            .edit = { { .range = r, .newText = "right" } }
+          });
         col += kComplainWord.length();
       }
       pos_line++;
     }
   });
-  if (!params.diagnostics.empty()) {
-    dispatcher->SendNotification("textDocument/publishDiagnostics", params);
+  return result;
+}
+
+void RunDiagnostics(const std::string &uri, const EditTextBuffer &buffer,
+                    JsonRpcDispatcher *dispatcher) {
+  PublishDiagnosticsParams params;
+  params.uri = uri;
+  const auto &lint_result = RunLint(buffer);
+  if (lint_result.empty()) return;
+  for (const auto &fix_pair : lint_result) {
+    params.diagnostics.emplace_back(fix_pair.diagnostic);
   }
+  dispatcher->SendNotification("textDocument/publishDiagnostics", params);
 }
 
 int main(int argc, char *argv[]) {

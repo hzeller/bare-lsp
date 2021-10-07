@@ -113,15 +113,31 @@ CodeActionParams:              # textDocument/codeAction
   range: Range
   #context: CodeActionContext
 
-CodeAction:  # Response to code action is either an array of these
+WorkspaceEdit:
+  #changes?: string->TextEdit+   # Map of file URI to associated edits...
+  changes: object                # ...not yet supporte by jcxxgen. Let's object
+
+# textDocument/codeAction will return an array of these (or array of Command)
+CodeAction:
   title: string
-  #kind?: string   # Kind of change e.g quickfix, refactor, ...
-  diagnostics+: Diagnostic
+  kind?: string                 # Kind of change e.g quickfix, refactor, ...
+  diagnostics+?: Diagnostic     # What diagnostic is this referring to ?
   isPreferred: boolean = false
-  #edit?: WorkspaceEdit
+  edit?: WorkspaceEdit
 
 # -- textDocument/publishDiagnostics
 # This is a notification that is sent from the server to the client
 PublishDiagnosticParams:
   uri: string
   diagnostics+: Diagnostic
+
+# A diagnostic and its fix. It is never used directly to send on the protocol
+# but rather a convenient internal representation for publishDiagnostics
+# and codeAction processing.
+TitledFix:
+  title: string
+  edit+: TextEdit
+
+DiagnosticFixPair:
+  diagnostic: Diagnostic
+  fixes+: TitledFix     # A choice of fixes for this problem

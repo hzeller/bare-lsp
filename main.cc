@@ -104,7 +104,7 @@ nlohmann::json HandleHighlightRequest(const BufferCollection &buffers,
                               (eow == line.length() || isspace(line[eow])));
         if (is_word) {
           result.emplace_back(DocumentHighlight{
-              .range = {{row, (int)col}, {row, (int)(col + word.length())}},
+              .range = {{row, (int)col}, {row, (int)eow}},
           });
           col = eow;
         } else {
@@ -154,23 +154,22 @@ std::vector<DiagnosticFixPair> RunLint(const EditTextBuffer &buffer) {
     for (absl::string_view line : absl::StrSplit(content, '\n')) {
       size_t col = 0;
       while ((col = line.find(kComplainWord, col)) != absl::string_view::npos) {
-        Range r =  {{pos_line, (int)col},
-                    {pos_line, (int)(col + kComplainWord.length())}};
+        Range r = {{pos_line, (int)col},
+                   {pos_line, (int)(col + kComplainWord.length())}};
         result.emplace_back(DiagnosticFixPair{
-            .diagnostic = {
-              .range = r,
-              .message = "That word is wrong :)",
-            },
+            .diagnostic =
+                {
+                    .range = r,
+                    .message = "That word is wrong :)",
+                },
             .fixes = {},
-          });
-        result.back().fixes.emplace_back(TitledFix{
-            .title = "Better Word",
-            .edit = { { .range = r, .newText = "correct" } }
-          });
-        result.back().fixes.emplace_back(TitledFix{
-            .title = "Ambiguous but same length",
-            .edit = { { .range = r, .newText = "right" } }
-          });
+        });
+        result.back().fixes.emplace_back(
+            TitledFix{.title = "Better Word",
+                      .edit = {{.range = r, .newText = "correct"}}});
+        result.back().fixes.emplace_back(
+            TitledFix{.title = "Ambiguous but same length",
+                      .edit = {{.range = r, .newText = "right"}}});
         col += kComplainWord.length();
       }
       pos_line++;
@@ -207,8 +206,7 @@ std::vector<CodeAction> HandleCodeAction(const BufferCollection &buffers,
   if (lint_result.empty()) return {};
   std::vector<CodeAction> result;
   for (const auto &fix_pair : lint_result) {
-    if (!rangeOverlap(fix_pair.diagnostic.range, p.range))
-      continue;
+    if (!rangeOverlap(fix_pair.diagnostic.range, p.range)) continue;
     bool preferred_fix = true;
     for (const auto &fix : fix_pair.fixes) {
       result.emplace_back(CodeAction{
@@ -217,7 +215,7 @@ std::vector<CodeAction> HandleCodeAction(const BufferCollection &buffers,
           .diagnostics = {fix_pair.diagnostic},
           .isPreferred = preferred_fix,
           // The following is translated from json, map uri -> edits.
-          .edit = {.changes = {{p.textDocument.uri, fix.edit }}},
+          .edit = {.changes = {{p.textDocument.uri, fix.edit}}},
       });
       preferred_fix = false;  // only the first is preferred.
     }

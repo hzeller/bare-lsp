@@ -153,10 +153,11 @@ So far implemented
   * Demo implementation of RPC handlers
      - Initialization (`initialize`, `initialized`)
      - Sample hover command (`textDocument/hover`)
-       (showing character count in word)
+       _(in demo: showing character count in word)_
      - Sample formatting command (`textDocument/formatting` and
-       `textDocument/rangeFormatting`) (centering text)
+       `textDocument/rangeFormatting`) _(centering text)_
      - Sample 'diagnostics' that mark all sequences `wrong` to be wrong :)
+     - codeAction: Provide alternative fixes to a problem.
      - Highlight: all words that are the same under the cursor are marked.
   * Prepared calling of linting etc. in idle time.
 

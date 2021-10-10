@@ -1,26 +1,57 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as vscodelc from 'vscode-languageclient/node';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-	
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "bare-lsp" is now active!');
+// Global object to dispose of previous language clients.
+let client: undefined | vscodelc.LanguageClient = undefined;
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('bare-lsp.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from bare-lsp!');
-	});
+function initLanguageClient() {
+	const config = vscode.workspace.getConfiguration('languageBareLSP');
+	const serverPath: string = config.get('serverPath') as string;
 
-	context.subscriptions.push(disposable);
+	const clangd: vscodelc.Executable = {
+        command: serverPath
+    };
+
+    const serverOptions: vscodelc.ServerOptions = clangd;
+
+    // Options to control the language client
+    const clientOptions: vscodelc.LanguageClientOptions = {
+        // Register the server for plain text documents
+        documentSelector: [{ scheme: 'file', language: 'plaintext' }]
+    };
+
+    // Create the language client and start the client.
+    client = new vscodelc.LanguageClient(
+        'languageBareLSP',
+        'Bare LSP example server',
+        serverOptions,
+        clientOptions
+    );
+    client.start();
 }
 
-// this method is called when your extension is deactivated
-export function deactivate() {}
+// VSCode entrypoint to bootstrap an extension
+export function activate(_: vscode.ExtensionContext) {
+	// If a configuration change even it fired, let's dispose
+	// of the previous client and create a new one.
+	vscode.workspace.onDidChangeConfiguration((event) => {
+		if (!event.affectsConfiguration('languageBareLSP')) {
+			return;
+		}
+		if (!client) {
+           return initLanguageClient(); 
+        }
+        client.stop().finally(() => {
+            initLanguageClient();
+        });
+	});
+	return initLanguageClient();
+}
+
+// Entrypoint to tear it down.
+export function deactivate(): Thenable<void> | undefined {
+    if (!client) {
+        return undefined;
+    }
+	return client.stop();
+}
